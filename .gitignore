@@ -1,0 +1,10 @@
+*.qar
+*.qarlog
+output_files/
+incremental_db/
+db/
+simulation/
+*.json
+*.vwf
+*.bak
+*.rpt
