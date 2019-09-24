@@ -9,6 +9,10 @@ module ProgramDecoder(
 	output reg JMP_flag = 0,
 	output reg CALL_flag = 0,
 	output reg RET_flag = 0,
+	output reg PUSH_flag = 0,
+	output reg POP_flag = 0,
+	output reg GSA_flag = 0,
+	output reg SWITCH_flag = 0,
 	output reg [3:0] Mini_ALU_op,
 	output reg [31:0] Mini_ALU_v1,
 	output reg [31:0] Mini_ALU_v2
@@ -25,6 +29,10 @@ module ProgramDecoder(
 					JMP_flag = 1;
 					CALL_flag = 0;
 					RET_flag = 0;
+					PUSH_flag = 0;
+					POP_flag = 0;
+					GSA_flag = 0;
+					SWITCH_flag = 0;
 				end
 
 				5'b01001: begin // JMPi
@@ -34,6 +42,10 @@ module ProgramDecoder(
 					JMP_flag = 1;
 					CALL_flag = 0;
 					RET_flag = 0;
+					PUSH_flag = 0;
+					POP_flag = 0;
+					GSA_flag = 0;
+					SWITCH_flag = 0;
 				end
 
 				5'b01010: begin // JMPfi
@@ -43,6 +55,10 @@ module ProgramDecoder(
 					JMP_flag = 1;
 					CALL_flag = 0;
 					RET_flag = 0;
+					PUSH_flag = 0;
+					POP_flag = 0;
+					GSA_flag = 0;
+					SWITCH_flag = 0;
 				end
 
 				5'b01011: begin // JMPbi
@@ -52,6 +68,10 @@ module ProgramDecoder(
 					JMP_flag = 1;
 					CALL_flag = 0;
 					RET_flag = 0;
+					PUSH_flag = 0;
+					POP_flag = 0;
+					GSA_flag = 0;
+					SWITCH_flag = 0;
 				end
 
 				5'b00101: begin // JMPC
@@ -65,6 +85,10 @@ module ProgramDecoder(
 					
 					CALL_flag = 0;
 					RET_flag = 0;
+					PUSH_flag = 0;
+					POP_flag = 0;
+					GSA_flag = 0;
+					SWITCH_flag = 0;
 				end
 
 				5'b01101: begin // JMPCi
@@ -78,6 +102,10 @@ module ProgramDecoder(
 					
 					CALL_flag = 0;
 					RET_flag = 0;
+					PUSH_flag = 0;
+					POP_flag = 0;
+					GSA_flag = 0;
+					SWITCH_flag = 0;
 				end
 
 				5'b01110: begin // JMPCfi
@@ -91,6 +119,10 @@ module ProgramDecoder(
 					
 					CALL_flag = 0;
 					RET_flag = 0;
+					PUSH_flag = 0;
+					POP_flag = 0;
+					GSA_flag = 0;
+					SWITCH_flag = 0;
 				end
 
 				5'b01111: begin // JMPCbi
@@ -104,6 +136,10 @@ module ProgramDecoder(
 
 					CALL_flag = 0;
 					RET_flag = 0;
+					PUSH_flag = 0;
+					POP_flag = 0;
+					GSA_flag = 0;
+					SWITCH_flag = 0;
 				end
 
 				5'b10000: begin // CALL
@@ -113,6 +149,10 @@ module ProgramDecoder(
 					CALL_flag = 1;
 					RET_flag = 0;
 					JMP_flag = 0;
+					PUSH_flag = 0;
+					POP_flag = 0;
+					GSA_flag = 0;
+					SWITCH_flag = 0;
 				end
 
 				5'b10001: begin // CALLi
@@ -122,6 +162,10 @@ module ProgramDecoder(
 					CALL_flag = 1;
 					RET_flag = 0;
 					JMP_flag = 0;
+					PUSH_flag = 0;
+					POP_flag = 0;
+					GSA_flag = 0;
+					SWITCH_flag = 0;
 				end
 
 				5'b10010: begin // RET
@@ -131,6 +175,10 @@ module ProgramDecoder(
 					JMP_flag = 0;
 					CALL_flag = 0;
 					RET_flag = 1;
+					PUSH_flag = 0;
+					POP_flag = 0;
+					GSA_flag = 0;
+					SWITCH_flag = 0;
 				end
 
 				5'b11000: begin // HALT
@@ -140,6 +188,62 @@ module ProgramDecoder(
 					JMP_flag = 1;
 					CALL_flag = 0;
 					RET_flag = 0;
+					PUSH_flag = 0;
+					POP_flag = 0;
+					GSA_flag = 0;
+					SWITCH_flag = 0;
+				end
+
+				5'b11001: begin // PUSH
+					Mini_ALU_op = 0;
+					Mini_ALU_v1 = f_register_value;
+					Mini_ALU_v2 = 32'b0;
+					JMP_flag = 0;
+					CALL_flag = 0;
+					RET_flag = 0;
+					PUSH_flag = 1;
+					POP_flag = 0;
+					GSA_flag = 0;
+					SWITCH_flag = 0;
+				end
+
+				5'b11010: begin // POP
+					Mini_ALU_op = 0;
+					Mini_ALU_v1 = DMA_current_instruction[23:16]; // Code from register inserted in the third reg pos
+					Mini_ALU_v2 = 32'b0;
+					JMP_flag = 0;
+					CALL_flag = 0;
+					RET_flag = 0;
+					PUSH_flag = 0;
+					POP_flag = 1;
+					GSA_flag = 0;
+					SWITCH_flag = 0;
+				end
+
+				5'b11011: begin // GSA
+					Mini_ALU_op = 0;
+					Mini_ALU_v1 = DMA_current_instruction[23:16]; // Code from register inserted in the third reg pos
+					Mini_ALU_v2 = 32'b0;
+					JMP_flag = 0;
+					CALL_flag = 0;
+					RET_flag = 0;
+					PUSH_flag = 0;
+					POP_flag = 0;
+					GSA_flag = 1;
+					SWITCH_flag = 0;
+				end
+
+				5'b11100: begin // SWITCH
+					Mini_ALU_op = 0;
+					Mini_ALU_v1 = immediate;
+					Mini_ALU_v2 = 32'b0;
+					JMP_flag = 0;
+					CALL_flag = 0;
+					RET_flag = 0;
+					PUSH_flag = 0;
+					POP_flag = 0;
+					GSA_flag = 0;
+					SWITCH_flag = 1;
 				end
 				
 				default: begin
@@ -149,6 +253,10 @@ module ProgramDecoder(
 					Mini_ALU_v2 = 0;
 					CALL_flag = 0;
 					RET_flag = 0;
+					PUSH_flag = 0;
+					POP_flag = 0;
+					GSA_flag = 0;
+					SWITCH_flag = 0;
 				end
 			
 			endcase
@@ -159,6 +267,10 @@ module ProgramDecoder(
 			Mini_ALU_v2 = 0;
 			CALL_flag = 0;
 			RET_flag = 0;
+			PUSH_flag = 0;
+			POP_flag = 0;
+			GSA_flag = 0;
+			SWITCH_flag = 0;
 		end
 	end
 

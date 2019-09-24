@@ -81,6 +81,10 @@ module DataPath(
 	
 	wire CALL_flag;
 	wire RET_flag;
+	wire PUSH_flag;
+	wire POP_flag;
+	wire GSA_flag;
+	wire SWITCH_flag;
 
 	wire [15:0] PC_pos;
 	wire [31:0] JMP_pos;
@@ -91,6 +95,7 @@ module DataPath(
 	wire [31:0] r_edx;
 	wire [3:0] r_clk;
 	wire [15:0] r_esp;
+	wire r_src;
 	
 	wire [7:0] f_register_code;
 	wire [31:0] f_register_value;
@@ -102,7 +107,9 @@ module DataPath(
 	wire [31:0] t_register_value;
 
 	reg init_flag = 0;
-	wire [31:0] DMA_current_instruction; // CURRENT INSTRUCTION
+	wire [31:0] curr_instruction;
+	wire [31:0] ram_instruction;
+	wire [31:0] rom_instruction;
 	wire [2:0] ID_type;
 	wire [4:0] ID_func;
 	wire [23:0] immediate;
@@ -187,8 +194,16 @@ module DataPath(
 
 		CALL_flag,
 		RET_flag,
+		PUSH_flag,
+		POP_flag,
+		GSA_flag,
+		SWITCH_flag,
 
-		PC_pos
+		PC_pos,
+		
+		JMP_write_back_flag,
+		JMP_write_back_code,
+		JMP_write_back_value
 	);
 
 	WriteController inst_writecontroller(
@@ -231,7 +246,7 @@ module DataPath(
 		clock,
 		DMA_Apply_clock,
 		DMA_ENB,
-		DMA_current_instruction,
+		curr_instruction,
 		f_register_value,
 		s_register_value,
 		t_register_value,
@@ -252,7 +267,7 @@ module DataPath(
 	single_port_rom inst_instructionmem(
 		PC_pos,
 		physical_clock,
-		DMA_current_instruction
+		rom_instruction
 	);
 
 	wire [31:0] RAM_data;
@@ -261,26 +276,56 @@ module DataPath(
 	wire [15:0] RAM_write_addr;
 	wire [31:0] RAM_write_data;
 	
-	RAMMemory inst_datamem(
+	/*RAMMemory inst_datamem(
 		RAM_write_data,
 		RAM_write_addr,
 		RAM_write_flag,
 		physical_clock,
 		RAM_data
+	);*/
+	
+	wire RAM_second_channel_flag;
+	//wire [15:0] RAM_second_channel_addr; // PC_pos
+	wire [31:0] RAM_second_channel_data;
+	
+	assign RAM_second_channel_flag = 0;
+	assign RAM_second_channel_data = 32'b0;
+	
+	InstructionController(
+		r_src,
+		rom_instruction,
+		ram_instruction,
+		curr_instruction
+	);
+	
+	DualPortRAM inst_datamem(
+		RAM_write_data,
+		RAM_second_channel_data,
+		RAM_write_addr,
+		PC_pos,
+		RAM_write_flag,
+		RAM_second_channel_flag,
+		physical_clock,
+		RAM_data,
+		ram_instruction
 	);
 	
 	ProgramDecoder inst_programdec(
 		JMP_ENB,
-		DMA_current_instruction,
+		curr_instruction,
 		f_register_value,
 		s_register_value,
 		t_register_value,
-		DMA_current_instruction[23:0],
+		curr_instruction[23:0],
 		PC_pos,
 
 		JMP_flag,
 		CALL_flag,
 		RET_flag,
+		PUSH_flag,
+		POP_flag,
+		GSA_flag,
+		SWITCH_flag,
 
 		M_ALU_op,
 		M_ALU_v1,
@@ -298,7 +343,7 @@ module DataPath(
 	//Test inst_2 (clock, write_back_code, write_back_value);
 
 	InstructionDecoder inst_instdec(
-		DMA_current_instruction,
+		curr_instruction,
 		ID_type,
 		ID_func,
 		f_register_code,
@@ -309,11 +354,11 @@ module DataPath(
 	
 	ALUDecoder inst_aludec(
 		ALU_ENB,
-		DMA_current_instruction,
+		curr_instruction,
 		f_register_value,
 		s_register_value,
 		t_register_value,
-		DMA_current_instruction[23:0],
+		curr_instruction[23:0],
 
 		ALU_op,
 		ALU_v1,
@@ -362,6 +407,7 @@ module DataPath(
 		r_edx,
 		r_clk,
 		r_esp,
+		r_src,
 		
 		STACK_push_flag,
 		STACK_push_value
@@ -426,11 +472,11 @@ module DataPath(
 	NStackDecoder inst_stackdec(
 		init_flag,
 		STACK_ENB,
-		DMA_current_instruction,
+		curr_instruction,
 		f_register_value,
 		s_register_value,
 		t_register_value,
-		DMA_current_instruction[23:0],
+		curr_instruction[23:0],
 	
 		STACK_TOP,
 	

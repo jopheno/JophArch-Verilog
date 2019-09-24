@@ -1,192 +1,470 @@
-module DMA(
-	input clock, // Virtual_Clock
-	input init_flag, // Flag that initializes the system
+module DMA (
+	input init_flag,
+	input clock,
+	input mclock,
+	input DMA_Apply_Btn,
 	input DMA_ENB,
-	input [21:0] IO_in, // Input values
-	output reg [25:0] IO_out, // Output register values
-	input DMA_Apply_Btn, // Apply new combination of inputs
-	// input [15:0] Instructions_Memory_ReadPos, // Program Counter
-	input [31:0] DMA_current_instruction, // Instruction Readed
+	input [31:0] DMA_current_instruction,
 	input [31:0] f_register_value,
 	input [31:0] s_register_value,
 	input [31:0] t_register_value,
-	output reg WB_FLAG,
-	output reg [7:0] WB_POS,
-	output reg [31:0] WB_VALUE,
-	output reg [31:0] Input_Queue_Amount_READ,
-	output reg [31:0] Input_Queue_Amount_WRITE
+	input [21:0] IO_in,
+
+	input [31:0] RAM_data,
+	input [15:0] r_esp,
+	
+	input [31:0] ram_wb_data,
+	input [31:0] hdd_data,
+
+	output reg [57:0] IO_out,
+	output reg DMA_write_back_flag,
+	output reg [7:0] DMA_write_back_code,
+	output reg [31:0] DMA_write_back_value,
+
+	output reg RAM_write_flag,
+	output reg [15:0] RAM_write_addr,
+	output reg [31:0] RAM_write_data,
+
+	output reg DMA_stack_flag,
+	output reg [15:0] DMA_stack_data,
+	
+	output wire ram_addr,
+	output wire hdd_addr
+	
+	output reg ram_wb_data,
+	output reg hdd_wb_data,
+	
+	output reg ram_wb_flag,
+	output reg hdd_wb_flag
 );
 
-	initial begin
-		Input_Queue_Amount_WRITE = 0;
-		Input_Queue_Amount_READ = 0;
-	end
-
-	//input clock;
-	//input init_flag;
-
-	//input [21:0] IO_in; // 0-17 SWs; 18-21 Keys;
-	//output reg [25:0] IO_out; // 0-7 GreenLEDS; 8-25;
-
-	//input DMA_Apply_Btn;
-
-	// Leitura combinacional dos valores das filas
-
-	//input [15:0] Instructions_Memory_ReadPos; // Program Counter
-	//output reg [31:0] DMA_current_instruction; // Current Instruction
-	//output reg test = 0;
-	//output reg [31:0] test2 = 0;
-
-	// Implementaçao de Fila de entradas, e sinal que indicara se a pilha esta vazia.
-
-	reg [21:0] Input_Queue [64];
-	reg [5:0] Input_Queue_WritePos = 0;
-	reg [5:0] Input_Queue_ReadPos = 0;
-	reg [7:0] Input_Queue_Amount = 0;
-	//reg [31:0] Input_Queue_Amount_READ = 0;
-	//reg [31:0] Input_Queue_Amount_WRITE = 0;
-
-	reg [25:0] Output_Queue [64];
-	reg [5:0] Output_Queue_WritePos = 0;
-	reg [5:0] Output_Queue_ReadPos = 0;
-	reg [7:0] Output_Queue_Amount = 0;
-
-	//reg [31:0] Instructions_Memory [256];
-	//reg [7:0] Instructions_Memory_WritePos = 0;
-
-	reg [7:0] Memory_Queue [128];
-	reg [6:0] Memory_Queue_WritePos = 0;
-	reg [6:0] Memory_Queue_ReadPos = 0;
+initial begin
+	integer i = 0;
 	
-	
-	/*Instructions_Memory[0] = 32'b000_00000_000_00000_00000000_00000001;
-	Instructions_Memory[1] = 32'b000_00000_000_00000_00000000_00000010;
-	Instructions_Memory[2] = 32'b000_00000_000_00000_00000000_00000011;*/
+	for (i = 0; i <= 57; i = i +1) begin
+		IO_out[i] = 0;
+   end
 
-	// TESTE DE SOMA, SUBTRACAO, MULTIPLICACAO, DIVISAO ! \\
-	
-	/*
-	Instructions_Memory[0] = 32'b011_00001_10000000_00000000_00000001; // ADDi eax 1 => EAX = 1
-	Instructions_Memory[1] = 32'b011_00010_10000000_00000000_00001011; // SUBi eax -11 => EAX = 10
-	Instructions_Memory[2] = 32'b011_00011_10000000_00000000_00000010; // MULTi eax 2 => EAX = 20
-	Instructions_Memory[3] = 32'b011_00100_10000000_00000000_00000010; // DIVi eax 2 => EAX = 10
-	*/
-	
-	// TESTE DO JUMPC \\
-	/*
-	Soma 1 em ambos os valores e compara-os, inicialmente dará igual e ele aceitara o JMPC
-	e voltara para a segunda instrucao somando um apenas no segundo registrador, logo a comparação agora
-	será negada, e assim ele não aceitará mais o JMPC porque eax != ebx
-	*/
+	RAM_write_flag = 0;
+	RAM_write_data = 8'b0;
+	RAM_write_addr = 32'b0;
+	Input_Queue_WritePos = 0;
+	Input_Queue_ReadPos = 0;
+	Input_Queue_ReadAmount = 0;
+	Input_Queue_WriteAmount = 0;
 
-	/*
-	Instructions_Memory[0] = 32'b011_00001_10000000_00000000_00000001; // ADDi eax 1
-	Instructions_Memory[1] = 32'b011_00001_10100000_00000000_00000001; // ADDi ebx 1
-	Instructions_Memory[2] = 32'b010_10000_10100000_10100000_10000000; // SET ebx eax
-	Instructions_Memory[3] = 32'b111_01101_10100000_00000000_00000001; // JUMPCi ebx 1
-	*/
-  
-	always@(*) begin
+end
+
+
+// OUTPUT Explanation
+/*
+IO_out[17:0] => Red LEDs [16 Red LEDs]
+IO_out[25:18] => Green LEDs [8 Green LEDs]
+
+IO_out[33:26] => Value at first display (from LEFT) [HEX6 && HEX7]
+IO_out[41:34] => Value at second display (from LEFT) [HEX4 && HEX5]
+IO_out[57:42] => Value at third display (from LEFT) [HEX1 && HEX2 && HEX3]
+*/
+
+	reg [21:0] Input_Queue [32];
+	reg [4:0] Input_Queue_WritePos = 0;
+	reg [4:0] Input_Queue_ReadPos = 0;
+	reg [15:0] Input_Queue_ReadAmount = 0;
+	reg [15:0] Input_Queue_WriteAmount = 0;
 	
-		if (DMA_ENB) begin
-		case (DMA_current_instruction[28:24])
+	// Memory Management
+	
+	reg [15:0] cells_amount = 0;
+	reg [15:0] pos_it = 0;
+	reg [15:0] ram_initial_pos = 0;
+	reg [15:0] hd_initial_pos = 0;
+
+	reg [1:0] cp_flag = 0;
+	reg cp_require_flag = 0;
+	reg cp_dir = 0;
+	
+	wire ram_addr;
+	wire hd_addr;
+
+	assign ram_addr = ram_initial_pos + pos_it;
+	assign hd_addr = hd_initial_pos + pos_it;
+	
+	always@(posedge mclock) begin
+		if(!init_flag) begin
+			pos_it = 0;
+		end
 		
-			5'b01001: begin // Read all inputs
-				WB_FLAG = 0;
-
-				if (Input_Queue_Amount_WRITE - Input_Queue_Amount_READ > 0) begin
-					WB_FLAG = 1;
-
-					WB_POS = DMA_current_instruction[23:16]; // THIRD REGISTER CODE (IMMEDIATE)
-					WB_VALUE[31:0] = 32'b0;
-					WB_VALUE[21:0] = Input_Queue[Input_Queue_ReadPos];
-					Input_Queue_ReadPos = Input_Queue_ReadPos + 1;
-					Input_Queue_Amount_READ = Input_Queue_Amount_READ + 1;
-				end
-			end
-
-			5'b01010: begin // Read especific input
-				WB_FLAG = 0;
-
-				if (Input_Queue_Amount_WRITE - Input_Queue_Amount_READ > 0) begin
-					WB_FLAG = 1;
-
-					WB_POS = DMA_current_instruction[23:16]; // THIRD REGISTER CODE (IMMEDIATE)
-					WB_VALUE[31:0] = 32'b0;
-					WB_VALUE[0] = Input_Queue[Input_Queue_ReadPos][DMA_current_instruction[7:0]];
-					Input_Queue_ReadPos = Input_Queue_ReadPos + 1;
-					Input_Queue_Amount_READ = Input_Queue_Amount_READ + 1;
-				end
-			end
-
-			5'b01011: begin // Get available inputs amount
-				WB_FLAG = 1;
-
-				WB_POS = DMA_current_instruction[23:16]; // THIRD REGISTER CODE (IMMEDIATE)
-				WB_VALUE[31:0] = 32'b0;
-				WB_VALUE[7:0] = (Input_Queue_Amount_WRITE - Input_Queue_Amount_READ);
-			end
-
-			5'b00001: begin // Set All Outputs
-				WB_FLAG = 0;
-
-				Output_Queue[Output_Queue_WritePos] = f_register_value[25:0]; // FIRST REGISTER VALUE
-				Output_Queue_WritePos = Output_Queue_WritePos + 1;
-				Output_Queue_Amount = Output_Queue_Amount + 1;
-			end
-
-			5'b00010: begin // Set Output -> Set value at third register value position to first register value [0] (FIRST POSITION)
-				WB_FLAG = 0;
-
-				if (Output_Queue_Amount > 0) begin
-					Output_Queue[Output_Queue_WritePos] = Output_Queue[Output_Queue_WritePos-1];
-				end else begin
-					Output_Queue[Output_Queue_WritePos] = IO_out;
-				end
-				Output_Queue[Output_Queue_WritePos][t_register_value] = f_register_value[0];
-				Output_Queue_WritePos = Output_Queue_WritePos + 1;
-			end
-
-			5'b00011: begin // Set Output Immediate -> Set value at third register IMMEDIATE position to first register IMMEDIATE value [0]
-				WB_FLAG = 0;
-
-				if (Output_Queue_Amount > 0) begin
-					Output_Queue[Output_Queue_WritePos] = Output_Queue[Output_Queue_WritePos-1];
-				end else begin
-					Output_Queue[Output_Queue_WritePos] = IO_out;
-				end
-				Output_Queue[Output_Queue_WritePos][DMA_current_instruction[23:16]] = DMA_current_instruction[0];
-				Output_Queue_WritePos = Output_Queue_WritePos + 1;
-			end
+		if (cp_flag == 1) begin
+			if (pos_it < cells_amount)
+				pos_it = pos_it + 1;
 			
-			default: begin WB_FLAG = 0; end
+			if (pos_it == cells_amount)
+				cp_flag = 2;
+			
+			
+		end
 
-		endcase
+		if (cp_flag == 0 && cp_require_flag == 1)
+			cp_flag = 1;
+		
+		if (cp_flag == 2 && cp_require_flag == 0) begin
+			cp_flag = 0;
+			pos_it = 0;
+		end
+	end
+	
+	always@(negedge mclock) begin
+		if (cp_flag == 1) begin
+			if (cp_dir == 1) begin
+				hdd_wb_data = ram_wb_data;
+				hdd_wb_flag = 1;
+
+				ram_wb_data = 0;
+				ram_wb_flag = 0;
+
+			end else if (cp_dir == 2) begin
+				ram_wb_data = hdd_wb_data;
+				ram_wb_flag = 1;
+				
+				hdd_wb_data = 0;
+				hdd_wb_flag = 0;
+			end else begin
+				ram_wb_data = 0;
+				ram_wb_flag = 0;
+				
+				hdd_wb_data = 0;
+				hdd_wb_flag = 0;
+			end
 		end else begin
-			WB_FLAG = 0;
-			WB_POS = 8'b0;
-			WB_VALUE = 32'b0;
+			ram_wb_data = 0;
+			ram_wb_flag = 0;
+				
+			hdd_wb_data = 0;
+			hdd_wb_flag = 0;
 		end
-	
-		//DMA_current_instruction = Instructions_Memory[Instructions_Memory_ReadPos[7:0]];
+
 	end
-  
+
 	always@(negedge clock) begin
-	
-		if (Output_Queue_ReadPos < Output_Queue_WritePos) begin
-			IO_out = Output_Queue[Output_Queue_ReadPos];
-			Output_Queue_ReadPos = Output_Queue_ReadPos + 1;
+		if (!init_flag) begin
+			IO_out[57:0] = 58'b0;
+		end
+		
+		if (cp_flag == 2) begin
+			// Notify scheduler that copy has ended !
+			cp_require_flag = 0;
+		end
+
+		if (DMA_ENB) begin
+
+		case (DMA_current_instruction[28:24])
+			
+				(5'b01001): begin // RAI - READ ALL INPUTS
+					if (Input_Queue_WriteAmount > Input_Queue_ReadAmount) begin
+						Input_Queue_ReadPos = Input_Queue_ReadPos + 1;
+						Input_Queue_ReadAmount = Input_Queue_ReadAmount + 1;
+					end
+				end
+			
+				(5'b01010): begin // RI - READ INPUT
+					if (Input_Queue_WriteAmount > Input_Queue_ReadAmount) begin
+						Input_Queue_ReadPos = Input_Queue_ReadPos + 1;
+						Input_Queue_ReadAmount = Input_Queue_ReadAmount + 1;
+					end
+				end
+				(5'b00001): begin // SAO - Set all outputs
+
+					
+					IO_out[25:0] = {6'b0, f_register_value};
+				end
+			
+				(5'b00010): begin // SO - Set Output -> Set value from a single output depending on the value passed through the last 8 bits of register value
+
+					
+					if (DMA_current_instruction[23:16] == 8'b10000001) begin // USED TO SET DISPLAY 1 [8bits]
+						IO_out[33:26] = f_register_value[7:0];
+						
+					end else if (DMA_current_instruction[23:16] == 8'b10000010) begin // USED TO SET DISPLAY 2 [8bits]
+						IO_out[41:34] = f_register_value[7:0];
+						
+					end else if (DMA_current_instruction[23:16] == 8'b10000011) begin // USED TO SET DISPLAY 3 [16bits]
+						IO_out[57:42] = f_register_value[15:0];
+						
+					end else begin
+						IO_out[DMA_current_instruction[23:16]] = f_register_value[0];
+					end
+					
+				end
+			
+				(5'b00011): begin // SOi - Set Output Immediate -> Set value at third register IMMEDIATE position to first register IMMEDIATE value [0]
+					
+					case (DMA_current_instruction[23:16])
+						(8'b10000001): IO_out[33:26] = DMA_current_instruction[7:0]; // USED TO SET DISPLAY 1 [8bits]
+						(8'b10000010): IO_out[41:34] = DMA_current_instruction[7:0]; // USED TO SET DISPLAY 2 [8bits]
+						(8'b10000011): IO_out[57:42] = DMA_current_instruction[15:0]; // USED TO SET DISPLAY 3 [16bits]
+						default: IO_out[DMA_current_instruction[23:16]] = DMA_current_instruction[0];
+					endcase
+
+				end
+			
+				(5'b01100): begin // PAUSE
+					if (Input_Queue_WriteAmount > Input_Queue_ReadAmount) begin
+						Input_Queue_ReadPos = Input_Queue_ReadPos + 1;
+						Input_Queue_ReadAmount = Input_Queue_ReadAmount + 1;
+					end
+				end
+		endcase
+
+		end
+
+	end
+
+	always@(*) begin
+		if (!init_flag) begin
+			//IO_out[57:0] = 58'b0;
+
+			RAM_write_flag = 0;
+			RAM_write_data = 8'b0;
+			RAM_write_addr = 32'b0;
+			
+			DMA_stack_flag = 0;
+			DMA_stack_data = 16'b0;
+		end
+
+		if (DMA_ENB) begin
+			case (DMA_current_instruction[28:24])
+			
+				(5'b01001): begin // RAI - READ ALL INPUTS
+					if (Input_Queue_WriteAmount > Input_Queue_ReadAmount) begin
+						DMA_write_back_flag = 1;
+						DMA_write_back_code = DMA_current_instruction[23:16];
+						DMA_write_back_value = {10'b0, Input_Queue[Input_Queue_ReadPos]};
+						//Input_Queue_ReadPos = Input_Queue_ReadPos + 1;
+						//Input_Queue_ReadAmount = Input_Queue_ReadAmount + 1;
+						RAM_write_flag = 0;
+						RAM_write_addr = 0;
+						RAM_write_data = 0;
+						DMA_stack_flag = 0;
+						DMA_stack_data = 16'b0;
+					end else begin
+						DMA_write_back_flag = 0;
+						DMA_write_back_code = 0;
+						DMA_write_back_value = 0;
+						RAM_write_flag = 0;
+						RAM_write_addr = 0;
+						RAM_write_data = 0;
+						DMA_stack_flag = 0;
+						DMA_stack_data = 16'b0;
+					end
+				end
+			
+				(5'b01010): begin // RI - READ INPUT
+					if (Input_Queue_WriteAmount > Input_Queue_ReadAmount) begin
+						DMA_write_back_flag = 1;
+						DMA_write_back_code = DMA_current_instruction[23:16];
+						if (DMA_current_instruction[7:0] == 8'b10000000) // 8 bits
+							DMA_write_back_value = {24'b0, Input_Queue[Input_Queue_ReadPos][7:0]};
+						else if (DMA_current_instruction[7:0] == 8'b10000001) // 16 bits
+							DMA_write_back_value = {16'b0, Input_Queue[Input_Queue_ReadPos][15:0]};
+						else
+							DMA_write_back_value = {31'b0, Input_Queue[Input_Queue_ReadPos][DMA_current_instruction[7:0]]};
+
+						//Input_Queue_ReadPos = Input_Queue_ReadPos + 1;
+						//Input_Queue_ReadAmount = Input_Queue_ReadAmount + 1;
+						RAM_write_flag = 0;
+						RAM_write_addr = 0;
+						RAM_write_data = 0;
+						
+						DMA_stack_flag = 0;
+						DMA_stack_data = 16'b0;
+					end else begin
+						DMA_write_back_flag = 0;
+						DMA_write_back_code = 0;
+						DMA_write_back_value = 0;
+						RAM_write_flag = 0;
+						RAM_write_addr = 0;
+						RAM_write_data = 0;
+						
+						DMA_stack_flag = 0;
+						DMA_stack_data = 16'b0;
+					end
+				end
+			
+				(5'b01011): begin // GIA - GET INPUTS AMOUNT
+					DMA_write_back_flag = 1;
+					DMA_write_back_code = DMA_current_instruction[23:16];
+					DMA_write_back_value = (Input_Queue_WriteAmount-Input_Queue_ReadAmount);
+					RAM_write_flag = 0;
+					RAM_write_addr = 0;
+					RAM_write_data = 0;
+					
+					DMA_stack_flag = 0;
+					DMA_stack_data = 16'b0;
+				end
+			
+				(5'b01100): begin // PAUSE - Similar to GIA, this instruction auto-read an input value if there is any available inputs to read.
+					DMA_write_back_flag = 1;
+					DMA_write_back_code = DMA_current_instruction[23:16];
+					DMA_write_back_value = (Input_Queue_WriteAmount-Input_Queue_ReadAmount);
+					RAM_write_flag = 0;
+					RAM_write_addr = 0;
+					RAM_write_data = 0;
+					
+					DMA_stack_flag = 0;
+					DMA_stack_data = 16'b0;
+				end
+				
+
+				(5'b10010): begin // LOADi - Memory Read Byte -> Read byte from memory
+				
+					DMA_write_back_flag = 1;
+					DMA_write_back_code = DMA_current_instruction[23:16];
+					DMA_write_back_value = RAM_data;
+					RAM_write_flag = 0;
+					RAM_write_data = 0;
+
+					RAM_write_addr = DMA_current_instruction[15:0]; // Immediate [24bits] => Memory Address
+					
+					DMA_stack_flag = 0;
+					DMA_stack_data = 16'b0;
+
+				end
+
+				
+				(5'b10011): begin // STOREi - Memory Save Byte -> Save byte in memory
+				
+					DMA_write_back_flag = 0;
+					DMA_write_back_code = 0;
+					DMA_write_back_value = 0;
+
+					RAM_write_flag = 1;
+					RAM_write_data = t_register_value[31:0];
+					RAM_write_addr = DMA_current_instruction[15:0]; // Immediate [24bits] => Memory Address
+					
+					DMA_stack_flag = 0;
+					DMA_stack_data = 16'b0;
+
+				end
+				
+				(5'b10000): begin // LOAD - Memory Read Byte -> Read byte from memory
+				
+					DMA_write_back_flag = 1;
+					DMA_write_back_code = DMA_current_instruction[23:16];
+					DMA_write_back_value = RAM_data;
+					RAM_write_flag = 0;
+					RAM_write_data = 0;
+
+					RAM_write_addr = f_register_value[15:0]; // Immediate [24bits] => Memory Address
+					
+					DMA_stack_flag = 0;
+					DMA_stack_data = 16'b0;
+
+				end
+
+				
+				(5'b10001): begin // STORE - Memory Save Byte -> Save byte in memory
+				
+					DMA_write_back_flag = 0;
+					DMA_write_back_code = 0;
+					DMA_write_back_value = 0;
+
+					RAM_write_flag = 1;
+					RAM_write_data = t_register_value[31:0];
+					RAM_write_addr = f_register_value[15:0]; // Immediate [24bits] => Memory Address
+					
+					DMA_stack_flag = 0;
+					DMA_stack_data = 16'b0;
+
+				end
+				
+				(5'b10100): begin // POP
+					integer aux;
+					
+					aux = r_esp[15:0] + 1;
+				
+					DMA_write_back_flag = 1;
+					DMA_write_back_code = DMA_current_instruction[23:16];
+					DMA_write_back_value = RAM_data;
+					
+					DMA_stack_flag = 1;
+					DMA_stack_data = aux;
+					
+					RAM_write_flag = 0;
+					RAM_write_data = 0;
+
+					RAM_write_addr = aux;
+
+				end
+
+				
+				(5'b10101): begin // PUSH
+					integer aux;
+					
+					aux = r_esp[15:0] - 1;
+				
+					DMA_write_back_flag = 0;
+					DMA_write_back_code = 0;
+					DMA_write_back_value = 0;
+					
+					DMA_stack_flag = 1;
+					DMA_stack_data = aux;
+
+					RAM_write_data = f_register_value[31:0];
+					RAM_write_addr = r_esp[15:0];
+					RAM_write_flag = 1;
+
+				end
+
+				
+				(5'b10110): begin // SP
+				
+					DMA_write_back_flag = 0;
+					DMA_write_back_code = 0;
+					DMA_write_back_value = 0;
+					
+					DMA_stack_flag = 1;
+					DMA_stack_data = f_register_value[15:0];
+
+					RAM_write_flag = 0;
+					RAM_write_data = 32'b0;
+					RAM_write_addr = 16'b0;
+
+				end
+				default: begin
+					DMA_write_back_flag = 0;
+					DMA_write_back_code = 0;
+					DMA_write_back_value = 0;
+					
+					RAM_write_flag = 0;
+					RAM_write_addr = 0;
+					RAM_write_data = 0;
+
+					DMA_stack_flag = 0;
+					DMA_stack_data = 16'b0;
+				end
+
+			endcase
+		end else begin
+			DMA_write_back_flag = 0;
+			DMA_write_back_code = 0;
+			DMA_write_back_value = 0;
+			
+			RAM_write_flag = 0;
+			RAM_write_addr = 0;
+			RAM_write_data = 0;
+
+			DMA_stack_flag = 0;
+			DMA_stack_data = 16'b0;
 		end
 	end
 	
-	always@(posedge DMA_Apply_Btn) begin
-		Input_Queue[Input_Queue_WritePos[5:0]] = IO_in[21:0];
-		Input_Queue_WritePos = Input_Queue_WritePos + 1;
-
-		Input_Queue_Amount_WRITE = Input_Queue_Amount_WRITE + 1;
+	always@(negedge DMA_Apply_Btn) begin
+	
+		if (init_flag) begin
+			Input_Queue[Input_Queue_WritePos] = IO_in;
+			Input_Queue_WritePos = Input_Queue_WritePos + 1;
+			Input_Queue_WriteAmount = Input_Queue_WriteAmount + 1;
+		end
 	end
-
-			
-			
+	
 endmodule
-  
