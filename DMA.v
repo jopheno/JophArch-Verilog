@@ -1,6 +1,8 @@
-module DMA (
+module DMA #(parameter MCLOCK_SIZE=8)
+(
 	input init_flag,
 	input clock,
+	input physical_clock,
 	input mclock,
 	input DMA_Apply_Btn,
 	input DMA_ENB,
@@ -10,10 +12,15 @@ module DMA (
 	input [31:0] t_register_value,
 	input [21:0] IO_in,
 
-	input [31:0] RAM_data,
 	input [15:0] r_esp,
+
+	input [31:0] ram_data,
 	
-	input [31:0] ram_wb_data,
+	// Parallel functions
+	
+	input [15:0] PC_pos,
+	
+	input [31:0] pram_data,
 	input [31:0] hdd_data,
 
 	output reg [57:0] IO_out,
@@ -28,14 +35,20 @@ module DMA (
 	output reg DMA_stack_flag,
 	output reg [15:0] DMA_stack_data,
 	
-	output wire ram_addr,
-	output wire hdd_addr
+	// Parallel functions
 	
-	output reg ram_wb_data,
-	output reg hdd_wb_data,
+	output wire [15:0] pram_addr,
+	output wire [15:0] hdd_addr,
 	
-	output reg ram_wb_flag,
-	output reg hdd_wb_flag
+	output reg [31:0] pram_wb_data,
+	output reg [31:0] hdd_wb_data,
+	
+	output reg pram_wb_flag,
+	output reg hdd_wb_flag,
+	
+	output reg [31:0] pram_instruction,
+	
+	output reg [1:0] cp_flag
 );
 
 initial begin
@@ -74,73 +87,129 @@ IO_out[57:42] => Value at third display (from LEFT) [HEX1 && HEX2 && HEX3]
 	
 	// Memory Management
 	
-	reg [15:0] cells_amount = 0;
-	reg [15:0] pos_it = 0;
-	reg [15:0] ram_initial_pos = 0;
-	reg [15:0] hd_initial_pos = 0;
+	// The size of the data that will be copied.
+	reg [15:0] req_cells_amount = 0;
+	reg [15:0] task_cells_amount = 0;
 
-	reg [1:0] cp_flag = 0;
-	reg cp_require_flag = 0;
-	reg cp_dir = 0;
+	// The initial destination position.
+	reg [15:0] req_ram_initial_pos = 0;
+	reg [15:0] task_ram_initial_pos = 0;
 	
-	wire ram_addr;
-	wire hd_addr;
+	reg [15:0] req_hdd_initial_pos = 0;
+	reg [15:0] task_hdd_initial_pos = 0;
 
-	assign ram_addr = ram_initial_pos + pos_it;
-	assign hd_addr = hd_initial_pos + pos_it;
+	// Position that is currently copying.
+	reg [15:0] pos_it = 0;
+
+	// Flag that indicates that a request is being executed.
+	reg [2:0] acp_flag = 0;
+	//reg [1:0] cp_flag = 0;
+	reg [1:0] task_cp_component = 0;
+	
+	// Flags controlled by request instructions
+	reg req_new_flag = 0;
+	reg [1:0] req_cp_component = 0;
+	
+	// MCLOCK_SIZE
+	reg [7:0] turn = 0;
+	reg read_instr = 0;
+	
+	// [0] for RAM Memory
+	// [1] for HDD Memory
+	// [2] for Network (TODO)
+
+	//assign ram_addr = task_ram_initial_pos + pos_it;
+	assign hdd_addr[15:0] = task_hdd_initial_pos[15:0] + pos_it[15:0];
+	
+	assign pram_addr[15:0] = (read_instr == 1) ? PC_pos[15:0] : task_ram_initial_pos[15:0] + pos_it[15:0] ;
 	
 	always@(posedge mclock) begin
 		if(!init_flag) begin
 			pos_it = 0;
+			cp_flag = 0;
+			task_cells_amount = 0;
+			task_ram_initial_pos = 0;
+			task_hdd_initial_pos = 0;
+			task_cp_component = 0;
+			turn = 0;
+			read_instr = 0;
 		end
 		
-		if (cp_flag == 1) begin
-			if (pos_it < cells_amount)
-				pos_it = pos_it + 1;
+		turn[7:0] = turn[7:0] + 1;
+		
+		// Turn will be incremented until it reaches (MCLOCK_SIZE-1), and then will be set to zero.
+		if (turn[7:0] >= (MCLOCK_SIZE-1)) begin
+			turn[7:0] = 0;
+		end
+		
+		if (turn[7:0] == 1)
+			read_instr = 1;
+		else
+			read_instr = 0;
+		
+		if (cp_flag[1:0] == 1 && turn[7:0] != 1) begin
+			if (pos_it[15:0] < task_cells_amount[15:0])
+				pos_it[15:0] = pos_it[15:0] + 1;
 			
-			if (pos_it == cells_amount)
-				cp_flag = 2;
-			
-			
+			if (pos_it[15:0] == task_cells_amount[15:0])
+				cp_flag[1:0] = 2;
 		end
 
-		if (cp_flag == 0 && cp_require_flag == 1)
-			cp_flag = 1;
-		
-		if (cp_flag == 2 && cp_require_flag == 0) begin
-			cp_flag = 0;
-			pos_it = 0;
+		// When there is a request for copying data and there is no request being attended at the moment,
+		// It will setup the environment to start a new task and will rise the flag indicating that a new
+		// task is being executed.
+
+		if (cp_flag[1:0] == 0 && req_new_flag == 1 && turn[7:0] != 1) begin
+
+			// Setting up task environment, backing up information needed to complete task.
+			task_cells_amount[15:0] = req_cells_amount[15:0];
+			task_ram_initial_pos[15:0] = req_ram_initial_pos[15:0];
+			task_hdd_initial_pos[15:0] = req_hdd_initial_pos[15:0];
+			task_cp_component[1:0] = req_cp_component[1:0];
+
+			pos_it[15:0] = 0;
+			cp_flag[1:0] = 1;
 		end
+		
+		if (cp_flag[1:0] == 2 && req_new_flag == 0 && turn[7:0] != 1) begin
+			cp_flag[1:0] = 0;
+			pos_it[15:0] = 0;
+		end
+		
 	end
 	
 	always@(negedge mclock) begin
-		if (cp_flag == 1) begin
-			if (cp_dir == 1) begin
-				hdd_wb_data = ram_wb_data;
-				hdd_wb_flag = 1;
+		if (turn[7:0] == 1) begin // Treat instruction
+			pram_instruction[31:0] = pram_data[31:0];
+		end
+		
+		if (cp_flag[1:0] == 1 && turn[7:0] != 1) begin // Not treating instruction
+				if (task_cp_component[1:0] == 0) begin
+					hdd_wb_data[31:0] = pram_data[31:0];
+					hdd_wb_flag = 1;
 
-				ram_wb_data = 0;
-				ram_wb_flag = 0;
+					pram_wb_data[31:0] = 0;
+					pram_wb_flag = 0;
 
-			end else if (cp_dir == 2) begin
-				ram_wb_data = hdd_wb_data;
-				ram_wb_flag = 1;
-				
-				hdd_wb_data = 0;
-				hdd_wb_flag = 0;
-			end else begin
-				ram_wb_data = 0;
-				ram_wb_flag = 0;
-				
-				hdd_wb_data = 0;
-				hdd_wb_flag = 0;
-			end
+				end else if (task_cp_component[1:0] == 1) begin
+					pram_wb_data[31:0] = hdd_data[31:0];
+					pram_wb_flag = 1;
+					
+					hdd_wb_data[31:0] = 0;
+					hdd_wb_flag = 0;
+				end else begin
+					pram_wb_data[31:0] = 0;
+					pram_wb_flag = 0;
+					
+					hdd_wb_data[31:0] = 0;
+					hdd_wb_flag = 0;
+				end
 		end else begin
-			ram_wb_data = 0;
-			ram_wb_flag = 0;
+			pram_wb_flag = 0;
+			pram_wb_data[31:0] = 0;
 				
-			hdd_wb_data = 0;
 			hdd_wb_flag = 0;
+			hdd_wb_data[31:0] = 0;
 		end
 
 	end
@@ -150,10 +219,10 @@ IO_out[57:42] => Value at third display (from LEFT) [HEX1 && HEX2 && HEX3]
 			IO_out[57:0] = 58'b0;
 		end
 		
-		if (cp_flag == 2) begin
+		//if (cp_flag == 2) begin
 			// Notify scheduler that copy has ended !
-			cp_require_flag = 0;
-		end
+		//	req_new_flag = 0;
+		//end
 
 		if (DMA_ENB) begin
 
@@ -219,7 +288,7 @@ IO_out[57:42] => Value at third display (from LEFT) [HEX1 && HEX2 && HEX3]
 
 	end
 
-	always@(*) begin
+	always@(posedge mclock) begin
 		if (!init_flag) begin
 			//IO_out[57:0] = 58'b0;
 
@@ -229,6 +298,15 @@ IO_out[57:42] => Value at third display (from LEFT) [HEX1 && HEX2 && HEX3]
 			
 			DMA_stack_flag = 0;
 			DMA_stack_data = 16'b0;
+		end
+		
+		if (cp_flag[1:0] == 1) begin
+			acp_flag[2:0] = acp_flag[2:0] + 1;
+		end
+		
+		if (cp_flag[1:0] == 2) begin
+			req_new_flag = 0;
+			acp_flag = 0;
 		end
 
 		if (DMA_ENB) begin
@@ -319,7 +397,7 @@ IO_out[57:42] => Value at third display (from LEFT) [HEX1 && HEX2 && HEX3]
 				
 					DMA_write_back_flag = 1;
 					DMA_write_back_code = DMA_current_instruction[23:16];
-					DMA_write_back_value = RAM_data;
+					DMA_write_back_value = ram_data;
 					RAM_write_flag = 0;
 					RAM_write_data = 0;
 
@@ -350,7 +428,7 @@ IO_out[57:42] => Value at third display (from LEFT) [HEX1 && HEX2 && HEX3]
 				
 					DMA_write_back_flag = 1;
 					DMA_write_back_code = DMA_current_instruction[23:16];
-					DMA_write_back_value = RAM_data;
+					DMA_write_back_value = ram_data;
 					RAM_write_flag = 0;
 					RAM_write_data = 0;
 
@@ -384,7 +462,7 @@ IO_out[57:42] => Value at third display (from LEFT) [HEX1 && HEX2 && HEX3]
 				
 					DMA_write_back_flag = 1;
 					DMA_write_back_code = DMA_current_instruction[23:16];
-					DMA_write_back_value = RAM_data;
+					DMA_write_back_value = ram_data;
 					
 					DMA_stack_flag = 1;
 					DMA_stack_data = aux;
@@ -430,6 +508,59 @@ IO_out[57:42] => Value at third display (from LEFT) [HEX1 && HEX2 && HEX3]
 					RAM_write_addr = 16'b0;
 
 				end
+			
+				(5'b11000): begin // REQFHDD
+					if ((cp_flag[1:0] == 0  && acp_flag[2:0] == 0 ) || acp_flag[2:0] > 0) begin
+						req_cells_amount[15:0] = s_register_value[15:0];
+						req_ram_initial_pos[15:0] = f_register_value[31:16];
+						req_hdd_initial_pos[15:0] = f_register_value[15:0];
+						req_new_flag = 1;
+						req_cp_component[1:0] = 1;
+						
+						acp_flag[2:0] = 1;
+
+						DMA_write_back_value = 1;
+					end else begin
+						DMA_write_back_value = 0;
+					end
+					
+					DMA_write_back_flag = 1;
+					DMA_write_back_code = DMA_current_instruction[23:16];
+					
+					DMA_stack_flag = 0;
+					DMA_stack_data = 16'b0;
+
+					RAM_write_flag = 0;
+					RAM_write_data = 32'b0;
+					RAM_write_addr = 16'b0;
+				end
+			
+				(5'b11001): begin // REQFRAM
+					if ((cp_flag[1:0] == 0  && acp_flag[2:0] == 0 ) || acp_flag[2:0] > 0) begin
+						req_cells_amount[15:0] = s_register_value[15:0];
+						req_ram_initial_pos[15:0] = f_register_value[15:0];
+						req_hdd_initial_pos[15:0] = f_register_value[31:16];
+						req_new_flag = 1;
+						req_cp_component[1:0] = 0;
+						
+						acp_flag[2:0] = 1;
+
+						DMA_write_back_value = 1;
+					end else begin
+						DMA_write_back_value = 0;
+					end
+					
+					DMA_write_back_flag = 1;
+					DMA_write_back_code = DMA_current_instruction[23:16];
+					
+					DMA_stack_flag = 0;
+					DMA_stack_data = 16'b0;
+
+					RAM_write_flag = 0;
+					RAM_write_data = 32'b0;
+					RAM_write_addr = 16'b0;
+				end
+
 				default: begin
 					DMA_write_back_flag = 0;
 					DMA_write_back_code = 0;

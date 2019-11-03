@@ -9,7 +9,8 @@ module DataPath(
 	output [31:0] DISPLAY_3,
 
 	input DMA_Apply_Btn,
-	output clock
+	output clock,
+	output [1:0] cp_flag
 
 );
 	wire [57:0] IO_out;
@@ -136,7 +137,7 @@ module DataPath(
 	
 	wire [31:0] clock_eff;
 
-	assign clock_eff = ( r_clk == 0 )? 16 : ( r_clk == 1 )?  50000 : ( r_clk == 2 )? 500000 : ( r_clk == 3 )? 5000000 : 50000000;
+	assign clock_eff = ( r_clk == 0 )? 128 : ( r_clk == 1 )?  50000 : ( r_clk == 2 )? 500000 : ( r_clk == 3 )? 5000000 : 50000000;
 
 
 	// FLAGS
@@ -173,6 +174,8 @@ module DataPath(
 	
 	wire DMA_Apply_clock;
 	
+	wire mclock;
+	
 	DeBounce inst_debounce(
 		physical_clock,
 		n_reset,
@@ -184,6 +187,12 @@ module DataPath(
 		physical_clock,
 		clock_eff,
 		clock
+	);
+
+	MemClock inst_memclock(
+		physical_clock,
+		clock_eff,
+		mclock
 	);
   
 	ProgramCounter inst_programcounter(
@@ -241,7 +250,7 @@ module DataPath(
 		DMA_ENB
 	);
 	
-	NDMA inst_new_dma(
+	/*NDMA inst_new_dma(
 		init_flag,
 		clock,
 		DMA_Apply_clock,
@@ -262,6 +271,62 @@ module DataPath(
 		RAM_write_data,
 		DMA_stack_flag,
 		DMA_stack_data
+	);*/
+
+	wire pram_wb_flag;
+	wire [15:0] pram_addr;
+	wire [31:0] pram_wb_data;
+	wire [31:0] pram_data;
+	
+	wire hdd_wb_flag;
+	wire [15:0] hdd_addr;
+	wire [31:0] hdd_wb_data;
+	wire [31:0] hdd_data;
+	
+	DMA inst_DMA(
+		init_flag,
+		clock,
+		physical_clock,
+		mclock,
+		DMA_Apply_clock,
+		DMA_ENB,
+		curr_instruction,
+		f_register_value,
+		s_register_value,
+		t_register_value,
+		IO_input,
+		r_esp,		
+		RAM_data,
+
+		// Parallel functions
+		PC_pos,
+		pram_data,
+		hdd_data,
+
+		
+		IO_out,
+		DMA_write_back_flag,
+		DMA_write_back_code,
+		DMA_write_back_value,
+		RAM_write_flag,
+		RAM_write_addr,
+		RAM_write_data,
+		DMA_stack_flag,
+		DMA_stack_data,
+		
+		// Parallel functions
+		
+		pram_addr,
+		hdd_addr,
+		pram_wb_data,
+		hdd_wb_data,
+		pram_wb_flag,
+		hdd_wb_flag,
+		
+		ram_instruction,
+		
+		cp_flag
+		
 	);
 	
 	single_port_rom inst_instructionmem(
@@ -284,13 +349,6 @@ module DataPath(
 		RAM_data
 	);*/
 	
-	wire RAM_second_channel_flag;
-	//wire [15:0] RAM_second_channel_addr; // PC_pos
-	wire [31:0] RAM_second_channel_data;
-	
-	assign RAM_second_channel_flag = 0;
-	assign RAM_second_channel_data = 32'b0;
-	
 	InstructionController(
 		r_src,
 		rom_instruction,
@@ -298,16 +356,28 @@ module DataPath(
 		curr_instruction
 	);
 	
-	DualPortRAM inst_datamem(
-		RAM_write_data,
-		RAM_second_channel_data,
-		RAM_write_addr,
-		PC_pos,
-		RAM_write_flag,
-		RAM_second_channel_flag,
+	HDD inst_hdd(
+		hdd_wb_data,
+		hdd_addr,
+		hdd_wb_flag,
 		physical_clock,
+		hdd_data
+	);
+	
+	DualPortRAM inst_dualportram(
+		RAM_write_data,
+		pram_wb_data,
+	
+		RAM_write_addr,
+		pram_addr,
+
+		RAM_write_flag,
+		pram_wb_flag,
+
+		physical_clock,
+
 		RAM_data,
-		ram_instruction
+		pram_data
 	);
 	
 	ProgramDecoder inst_programdec(

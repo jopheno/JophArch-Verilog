@@ -2,7 +2,7 @@
 // Single Port ROM
 
 module single_port_rom
-#(parameter DATA_WIDTH=32, parameter ADDR_WIDTH=10)
+#(parameter DATA_WIDTH=32, parameter ADDR_WIDTH=9)
 (
 	input [(ADDR_WIDTH-1):0] addr,
 	input clk, 
