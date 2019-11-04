@@ -96,9 +96,9 @@ module ProgramCounter(
 				
 				
 			end else if (SWITCH_flag == 1) begin
-				// r_src = immediate[0]; -> Primeiro bit do imediato.
 				
-				PRG_write_data[31:0] = result[0];
+				PC_pos = result[15:0];
+				PRG_write_data[31:0] = {31'b0, result[16]};
 				PRG_write_addr[7:0] = 8'b00100100;
 				PRG_write_flag = 1;
 				

@@ -235,6 +235,19 @@ module ProgramDecoder(
 
 				5'b11100: begin // SWITCH
 					Mini_ALU_op = 0;
+					Mini_ALU_v1 = f_register_value;
+					Mini_ALU_v2 = 32'b0;
+					JMP_flag = 0;
+					CALL_flag = 0;
+					RET_flag = 0;
+					PUSH_flag = 0;
+					POP_flag = 0;
+					GSA_flag = 0;
+					SWITCH_flag = 1;
+				end
+
+				5'b11101: begin // SWITCHi
+					Mini_ALU_op = 0;
 					Mini_ALU_v1 = immediate;
 					Mini_ALU_v2 = 32'b0;
 					JMP_flag = 0;
