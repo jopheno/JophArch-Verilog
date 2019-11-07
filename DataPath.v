@@ -323,8 +323,6 @@ module DataPath(
 		pram_wb_flag,
 		hdd_wb_flag,
 		
-		ram_instruction,
-		
 		cp_flag
 		
 	);
@@ -364,20 +362,42 @@ module DataPath(
 		hdd_data
 	);
 	
-	DualPortRAM inst_dualportram(
-		RAM_write_data,
-		pram_wb_data,
+	wire selected_flag;
+	wire [15:0] selected_addr;
+	wire[31:0] selected_data;
 	
-		RAM_write_addr,
-		pram_addr,
+	assign selected_flag = (DMA_ENB == 1) ? RAM_write_flag : pram_wb_flag;
+	assign selected_addr[15:0] = (DMA_ENB == 1) ? RAM_write_addr[15:0] : pram_addr[15:0];
+	assign selected_data[31:0] = (DMA_ENB == 1) ? RAM_write_data[31:0] : pram_wb_data[31:0];
 
-		RAM_write_flag,
-		pram_wb_flag,
+	wire [31:0] received_data;
+	assign RAM_data[31:0] = (DMA_ENB == 1) ? received_data[31:0] : 32'b0;
+	assign pram_data[31:0] = (DMA_ENB == 0) ? received_data[31:0] : 32'b0;
+	
+	//assign selected_flag = RAM_write_flag;
+	//assign selected_addr[15:0] = RAM_write_addr[15:0];
+	//assign selected_data[31:0] = RAM_write_data[31:0];
+	
+	wire ram_write_flag;
+	assign ram_write_flag = 1'b0;
+	wire [31:0] ram_write_data;
+	assign ram_write_data = 32'b0;
+	
+	DualPortRAM inst_dualportram(
+
+		ram_write_data,
+		selected_data,
+	
+		PC_pos,
+		selected_addr,
+
+		ram_write_flag,
+		selected_flag,
 
 		physical_clock,
 
-		RAM_data,
-		pram_data
+		ram_instruction,
+		received_data
 	);
 	
 	ProgramDecoder inst_programdec(
