@@ -29,6 +29,7 @@ module Registers(
 	output reg [3:0] r_clk,
 	output reg [15:0] r_esp,
 	output reg r_src,
+	output reg [15:0] r_k,
 	
 	output reg STACK_push_flag,
 	output reg [31:0] STACK_push_value
@@ -54,6 +55,7 @@ initial begin
 	r_esp[15:0] = 16'hFFFF;
 	r_clk[3:0] = 4'b0;
 	r_src = 0;
+	r_k[15:0] = 16'b0;
 	
 	STACK_push_flag = 0;
 	STACK_push_value[31:0] = 32'b0;
@@ -83,6 +85,7 @@ end
 	parameter clk = 8'b00100010;
 	parameter esp = 8'b10010011;
 	parameter src = 8'b00100100;
+	parameter k =   8'b01100100;
 
 	// EAX REGISTERs
 	parameter eax = 8'b10000000;
@@ -129,6 +132,7 @@ end
 			r_esp[15:0] = 16'hFFFF;
 			r_clk[3:0] = 4'b0;
 			r_src = 0;
+			r_k[15:0] = 16'b0;
 		end else begin
 		
 		if (DMA_stack_flag) begin
@@ -153,6 +157,7 @@ end
 			case (REG_write_back_code)
 				clk: r_clk = REG_write_back_data[3:0];
 				src: r_src = REG_write_back_data[0];
+				k: r_k = REG_write_back_data[15:0];
 
 				// EAX REGISTERs
 				eax: r_eax = REG_write_back_data;
@@ -218,6 +223,7 @@ end
 			clk: f_register_value = {28'b0,r_clk[3:0]};
 			esp: f_register_value = {16'b0,r_esp[15:0]};
 			src: f_register_value = {31'b0,r_src};
+			k: f_register_value = {16'b0,r_k[15:0]};
 
 			// EAX REGISTERs
 			eax: f_register_value = r_eax;
@@ -274,6 +280,7 @@ end
 			clk: s_register_value = {28'b0,r_clk[3:0]};
 			esp: s_register_value = {16'b0,r_esp[15:0]};
 			src: s_register_value = {31'b0,r_src};
+			k: s_register_value = {16'b0,r_k[15:0]};
 
 			// EAX REGISTERs
 			eax: s_register_value = r_eax;
@@ -330,6 +337,7 @@ end
 			clk: t_register_value = {28'b0,r_clk[3:0]};
 			esp: t_register_value = {16'b0,r_esp[15:0]};
 			src: t_register_value = {31'b0,r_src};
+			k: t_register_value = {16'b0,r_k[15:0]};
 
 			// EAX REGISTERs
 			eax: t_register_value = r_eax;

@@ -43,9 +43,7 @@ module DMA #(parameter MCLOCK_SIZE=8)
 	output reg [31:0] hdd_wb_data,
 	
 	output reg pram_wb_flag,
-	output reg hdd_wb_flag,
-	
-	output reg [1:0] cp_flag
+	output reg hdd_wb_flag
 );
 
 initial begin
@@ -102,7 +100,7 @@ IO_out[57:42] => Value at third display (from LEFT) [HEX1 && HEX2 && HEX3]
 
 	// Flag that indicates that a request is being executed.
 	reg acp_flag = 0;
-	//reg [1:0] cp_flag = 0;
+	reg [1:0] cp_flag = 0;
 	reg [1:0] task_cp_component = 0;
 	
 	// Flags controlled by request instructions

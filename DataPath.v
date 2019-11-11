@@ -16,6 +16,7 @@ module DataPath(
 	wire [57:0] IO_out;
 
 	assign IO_output[25:0] = IO_out[25:0];
+	assign cp_flag = {1'b0, timer_int};
 
 	VerilogDisplay inst_display1_0(
 		IO_out[29:26],
@@ -79,6 +80,7 @@ module DataPath(
 	wire DMA_ENB;
 	wire STACK_ENB;
 	wire JMP_ENB;
+	wire SCHED_ENB;
 	
 	wire CALL_flag;
 	wire RET_flag;
@@ -86,6 +88,8 @@ module DataPath(
 	wire POP_flag;
 	wire GSA_flag;
 	wire SWITCH_flag;
+	wire SYS_flag;
+	wire Kernel_flag;
 
 	wire [15:0] PC_pos;
 	wire [31:0] JMP_pos;
@@ -97,6 +101,7 @@ module DataPath(
 	wire [3:0] r_clk;
 	wire [15:0] r_esp;
 	wire r_src;
+	wire [15:0] r_k;
 	
 	wire [7:0] f_register_code;
 	wire [31:0] f_register_value;
@@ -146,7 +151,17 @@ module DataPath(
 	reg ALU_src_flag;
 	wire JMP_flag;
 
-	// Program Counter
+	// Scheduler
+	
+	wire DMA_op_ready;
+	wire timer_int;
+	wire op_int;
+	wire [15:0] int_pos;
+	wire [15:0] sys_int_pos;
+
+	wire SCHED_conf;
+	wire [3:0] SCHED_OP;
+	wire [15:0] SCHED_value;
 
 	
 	// Program Decoder
@@ -194,12 +209,18 @@ module DataPath(
 		clock_eff,
 		mclock
 	);
-  
+
 	ProgramCounter inst_programcounter(
 		clock,
 		init_flag,
 		JMP_flag,
 		JMP_pos,
+		r_k,
+		sys_int_pos,
+
+		timer_int,
+		op_int,
+		int_pos,
 
 		CALL_flag,
 		RET_flag,
@@ -207,6 +228,8 @@ module DataPath(
 		POP_flag,
 		GSA_flag,
 		SWITCH_flag,
+		SYS_flag,
+		Kernel_flag,
 
 		PC_pos,
 		
@@ -247,7 +270,8 @@ module DataPath(
 		ALU_ENB,
 		STACK_ENB,
 		JMP_ENB,
-		DMA_ENB
+		DMA_ENB,
+		SCHED_ENB
 	);
 	
 	/*NDMA inst_new_dma(
@@ -282,6 +306,22 @@ module DataPath(
 	wire [15:0] hdd_addr;
 	wire [31:0] hdd_wb_data;
 	wire [31:0] hdd_data;
+	
+	Scheduler inst_scheduler(
+		init_flag,
+		clock,
+		physical_clock,
+		DMA_op_ready,
+		r_k,
+		SCHED_ENB,
+		SCHED_conf,
+		SCHED_OP,
+		SCHED_value,
+		timer_int,
+		op_int,
+		int_pos,
+		sys_int_pos
+	);
 	
 	DMA inst_DMA(
 		init_flag,
@@ -321,9 +361,7 @@ module DataPath(
 		pram_wb_data,
 		hdd_wb_data,
 		pram_wb_flag,
-		hdd_wb_flag,
-		
-		cp_flag
+		hdd_wb_flag
 		
 	);
 	
@@ -347,7 +385,7 @@ module DataPath(
 		RAM_data
 	);*/
 	
-	InstructionController(
+	InstructionController inst_instruction_ctrl(
 		r_src,
 		rom_instruction,
 		ram_instruction,
@@ -399,6 +437,19 @@ module DataPath(
 		ram_instruction,
 		received_data
 	);
+
+	SchedulerDecoder inst_scheddec(
+		SCHED_ENB,
+		curr_instruction,
+		f_register_value,
+		s_register_value,
+		t_register_value,
+		curr_instruction[23:0],
+		PC_pos,
+		SCHED_conf,
+		SCHED_OP,
+		SCHED_value
+	);
 	
 	ProgramDecoder inst_programdec(
 		JMP_ENB,
@@ -416,6 +467,8 @@ module DataPath(
 		POP_flag,
 		GSA_flag,
 		SWITCH_flag,
+		SYS_flag,
+		Kernel_flag,
 
 		M_ALU_op,
 		M_ALU_v1,
@@ -498,6 +551,7 @@ module DataPath(
 		r_clk,
 		r_esp,
 		r_src,
+		r_k,
 		
 		STACK_push_flag,
 		STACK_push_value
@@ -516,69 +570,6 @@ module DataPath(
 		
 	
 	);*/
-
-
-
-	wire [31:0] STACK_data;
-
-	wire STACK_write_flag;
-	wire [15:0] STACK_write_addr;
-	wire [31:0] STACK_write_data;
-	
-	StackMemory inst_stack_ram(
-		STACK_write_data,
-		STACK_write_addr,
-		STACK_write_flag,
-		physical_clock,
-		STACK_data
-	);
-
-
-	wire STACK_pop_flag;
-	wire STACK_push_flag;
-	wire [31:0] STACK_push_value;
-
-	wire [31:0] STACK_TOP;
-
-	wire [15:0] STACK_AMOUNT;
-	
-	NStacks inst_nstacks(
-		STACK_ENB,
-		clock,
-		
-		STACK_pop_flag,
-		STACK_push_flag,
-		STACK_push_value,
-		STACK_data,
-
-		STACK_TOP,
-		STACK_AMOUNT,
-
-		STACK_write_flag,
-		STACK_write_addr,
-		STACK_write_data
-	);
-	
-	NStackDecoder inst_stackdec(
-		init_flag,
-		STACK_ENB,
-		curr_instruction,
-		f_register_value,
-		s_register_value,
-		t_register_value,
-		curr_instruction[23:0],
-	
-		STACK_TOP,
-	
-		STACK_AMOUNT,
-
-		STACK_pop_flag,
-
-		STACK_write_back_flag,
-		STACK_write_back_code,
-		STACK_write_back_value
-
-	);
   
 	always@(negedge clock) begin
 		init_flag = 1;

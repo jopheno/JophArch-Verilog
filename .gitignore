@@ -8,3 +8,4 @@ simulation/
 *.vwf
 *.bak
 *.rpt
+.qsys_edit/
