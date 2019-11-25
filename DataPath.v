@@ -16,7 +16,6 @@ module DataPath(
 	wire [57:0] IO_out;
 
 	assign IO_output[25:0] = IO_out[25:0];
-	assign cp_flag = {1'b0, timer_int};
 
 	VerilogDisplay inst_display1_0(
 		IO_out[29:26],
@@ -82,6 +81,7 @@ module DataPath(
 	wire JMP_ENB;
 	wire SCHED_ENB;
 	
+	wire NOP_flag;
 	wire CALL_flag;
 	wire RET_flag;
 	wire PUSH_flag;
@@ -90,6 +90,7 @@ module DataPath(
 	wire SWITCH_flag;
 	wire SYS_flag;
 	wire Kernel_flag;
+	wire Wait_flag;
 
 	wire [15:0] PC_pos;
 	wire [31:0] JMP_pos;
@@ -101,7 +102,7 @@ module DataPath(
 	wire [3:0] r_clk;
 	wire [15:0] r_esp;
 	wire r_src;
-	wire [15:0] r_k;
+	wire [31:0] r_k;
 	
 	wire [7:0] f_register_code;
 	wire [31:0] f_register_value;
@@ -139,6 +140,11 @@ module DataPath(
 	wire JMP_write_back_flag;
 	wire [7:0] JMP_write_back_code;
 	wire [31:0] JMP_write_back_value;
+
+	//wire SCHED_ENB;
+	wire SCHED_write_back_flag;
+	wire [7:0] SCHED_write_back_code;
+	wire [31:0] SCHED_write_back_value;
 	
 	wire [31:0] clock_eff;
 
@@ -183,6 +189,10 @@ module DataPath(
   
 	wire DMA_stack_flag;
 	wire [15:0] DMA_stack_data;
+	wire DMA_STACK;
+	
+	//wire [1:0] cp_flag;
+
 	// REGISTERs Wires
 	
 	reg n_reset = 1;
@@ -213,15 +223,16 @@ module DataPath(
 	ProgramCounter inst_programcounter(
 		clock,
 		init_flag,
-		JMP_flag,
+		JMP_ENB,
 		JMP_pos,
-		r_k,
 		sys_int_pos,
 
 		timer_int,
 		op_int,
 		int_pos,
 
+		NOP_flag,
+		JMP_flag,
 		CALL_flag,
 		RET_flag,
 		PUSH_flag,
@@ -230,8 +241,12 @@ module DataPath(
 		SWITCH_flag,
 		SYS_flag,
 		Kernel_flag,
+		Wait_flag,
+		
+		cp_flag,
 
 		PC_pos,
+		r_k,
 		
 		JMP_write_back_flag,
 		JMP_write_back_code,
@@ -259,6 +274,11 @@ module DataPath(
 		DMA_write_back_flag,
 		DMA_write_back_code,
 		DMA_write_back_value,
+
+		SCHED_ENB,
+		SCHED_write_back_flag,
+		SCHED_write_back_code,
+		SCHED_write_back_value,
 
 		REG_write_back_flag,
 		REG_write_back_code,
@@ -313,6 +333,9 @@ module DataPath(
 		physical_clock,
 		DMA_op_ready,
 		r_k,
+		PC_pos,
+		JMP_ENB,
+		JMP_flag,
 		SCHED_ENB,
 		SCHED_conf,
 		SCHED_OP,
@@ -320,7 +343,10 @@ module DataPath(
 		timer_int,
 		op_int,
 		int_pos,
-		sys_int_pos
+		sys_int_pos,
+		SCHED_write_back_flag,
+		SCHED_write_back_code,
+		SCHED_write_back_value
 	);
 	
 	DMA inst_DMA(
@@ -353,6 +379,7 @@ module DataPath(
 		RAM_write_data,
 		DMA_stack_flag,
 		DMA_stack_data,
+		DMA_STACK,
 		
 		// Parallel functions
 		
@@ -361,7 +388,9 @@ module DataPath(
 		pram_wb_data,
 		hdd_wb_data,
 		pram_wb_flag,
-		hdd_wb_flag
+		hdd_wb_flag,
+		
+		cp_flag
 		
 	);
 	
@@ -421,13 +450,21 @@ module DataPath(
 	wire [31:0] ram_write_data;
 	assign ram_write_data = 32'b0;
 	
+	wire [15:0] ram_instr_addr;
+	assign ram_instr_addr[15:0] = PC_pos[15:0] + r_k[15:0];
+
+	wire [15:0] ram_data_addr;
+	assign ram_data_addr[15:0] = (DMA_STACK == 1) ? selected_addr[15:0] : selected_addr[15:0] + r_k[15:0];
+	
 	DualPortRAM inst_dualportram(
 
 		ram_write_data,
 		selected_data,
 	
-		PC_pos,
-		selected_addr,
+		ram_instr_addr,
+		//PC_pos,
+		//selected_addr,
+		ram_data_addr,
 
 		ram_write_flag,
 		selected_flag,
@@ -459,7 +496,9 @@ module DataPath(
 		t_register_value,
 		curr_instruction[23:0],
 		PC_pos,
+		r_k,
 
+		NOP_flag,
 		JMP_flag,
 		CALL_flag,
 		RET_flag,
@@ -469,6 +508,7 @@ module DataPath(
 		SWITCH_flag,
 		SYS_flag,
 		Kernel_flag,
+		Wait_flag,
 
 		M_ALU_op,
 		M_ALU_v1,
@@ -539,6 +579,7 @@ module DataPath(
 		
 		DMA_stack_flag,
 		DMA_stack_data,
+		r_k,
 
 		f_register_value,
 		s_register_value,
@@ -551,7 +592,6 @@ module DataPath(
 		r_clk,
 		r_esp,
 		r_src,
-		r_k,
 		
 		STACK_push_flag,
 		STACK_push_value

@@ -33,6 +33,7 @@ module DMA #(parameter MCLOCK_SIZE=8)
 
 	output reg DMA_stack_flag,
 	output reg [15:0] DMA_stack_data,
+	output reg DMA_STACK,
 	
 	// Parallel functions
 	
@@ -43,7 +44,8 @@ module DMA #(parameter MCLOCK_SIZE=8)
 	output reg [31:0] hdd_wb_data,
 	
 	output reg pram_wb_flag,
-	output reg hdd_wb_flag
+	output reg hdd_wb_flag,
+	output reg [1:0] cp_flag = 0
 );
 
 initial begin
@@ -100,7 +102,7 @@ IO_out[57:42] => Value at third display (from LEFT) [HEX1 && HEX2 && HEX3]
 
 	// Flag that indicates that a request is being executed.
 	reg acp_flag = 0;
-	reg [1:0] cp_flag = 0;
+	//reg [1:0] cp_flag = 0;
 	reg [1:0] task_cp_component = 0;
 	
 	// Flags controlled by request instructions
@@ -304,6 +306,7 @@ IO_out[57:42] => Value at third display (from LEFT) [HEX1 && HEX2 && HEX3]
 						RAM_write_data = 0;
 						DMA_stack_flag = 0;
 						DMA_stack_data = 16'b0;
+
 					end else begin
 						DMA_write_back_flag = 0;
 						DMA_write_back_code = 0;
@@ -313,7 +316,10 @@ IO_out[57:42] => Value at third display (from LEFT) [HEX1 && HEX2 && HEX3]
 						RAM_write_data = 0;
 						DMA_stack_flag = 0;
 						DMA_stack_data = 16'b0;
+
 					end
+
+					DMA_STACK = 1'b0;
 				end
 			
 				(5'b01010): begin // RI - READ INPUT
@@ -335,6 +341,7 @@ IO_out[57:42] => Value at third display (from LEFT) [HEX1 && HEX2 && HEX3]
 						
 						DMA_stack_flag = 0;
 						DMA_stack_data = 16'b0;
+
 					end else begin
 						DMA_write_back_flag = 0;
 						DMA_write_back_code = 0;
@@ -345,7 +352,10 @@ IO_out[57:42] => Value at third display (from LEFT) [HEX1 && HEX2 && HEX3]
 						
 						DMA_stack_flag = 0;
 						DMA_stack_data = 16'b0;
+
 					end
+
+					DMA_STACK = 1'b0;
 				end
 			
 				(5'b01011): begin // GIA - GET INPUTS AMOUNT
@@ -358,6 +368,8 @@ IO_out[57:42] => Value at third display (from LEFT) [HEX1 && HEX2 && HEX3]
 					
 					DMA_stack_flag = 0;
 					DMA_stack_data = 16'b0;
+
+					DMA_STACK = 1'b0;
 				end
 			
 				(5'b01100): begin // PAUSE - Similar to GIA, this instruction auto-read an input value if there is any available inputs to read.
@@ -370,6 +382,8 @@ IO_out[57:42] => Value at third display (from LEFT) [HEX1 && HEX2 && HEX3]
 					
 					DMA_stack_flag = 0;
 					DMA_stack_data = 16'b0;
+
+					DMA_STACK = 1'b0;
 				end
 				
 
@@ -385,6 +399,8 @@ IO_out[57:42] => Value at third display (from LEFT) [HEX1 && HEX2 && HEX3]
 					
 					DMA_stack_flag = 0;
 					DMA_stack_data = 16'b0;
+
+					DMA_STACK = 1'b0;
 
 				end
 
@@ -402,6 +418,8 @@ IO_out[57:42] => Value at third display (from LEFT) [HEX1 && HEX2 && HEX3]
 					DMA_stack_flag = 0;
 					DMA_stack_data = 16'b0;
 
+					DMA_STACK = 1'b0;
+
 				end
 				
 				(5'b10000): begin // LOAD - Memory Read Byte -> Read byte from memory
@@ -416,6 +434,8 @@ IO_out[57:42] => Value at third display (from LEFT) [HEX1 && HEX2 && HEX3]
 					
 					DMA_stack_flag = 0;
 					DMA_stack_data = 16'b0;
+
+					DMA_STACK = 1'b0;
 
 				end
 
@@ -432,6 +452,8 @@ IO_out[57:42] => Value at third display (from LEFT) [HEX1 && HEX2 && HEX3]
 					
 					DMA_stack_flag = 0;
 					DMA_stack_data = 16'b0;
+
+					DMA_STACK = 1'b0;
 
 				end
 				
@@ -451,6 +473,8 @@ IO_out[57:42] => Value at third display (from LEFT) [HEX1 && HEX2 && HEX3]
 					RAM_write_data = 0;
 
 					RAM_write_addr = aux;
+					
+					DMA_STACK = 1'b1;
 
 				end
 
@@ -471,6 +495,8 @@ IO_out[57:42] => Value at third display (from LEFT) [HEX1 && HEX2 && HEX3]
 					RAM_write_addr = r_esp[15:0];
 					RAM_write_flag = 1;
 
+					DMA_STACK = 1'b1;
+
 				end
 
 				
@@ -486,6 +512,8 @@ IO_out[57:42] => Value at third display (from LEFT) [HEX1 && HEX2 && HEX3]
 					RAM_write_flag = 0;
 					RAM_write_data = 32'b0;
 					RAM_write_addr = 16'b0;
+
+					DMA_STACK = 1'b0;
 
 				end
 			
@@ -515,6 +543,8 @@ IO_out[57:42] => Value at third display (from LEFT) [HEX1 && HEX2 && HEX3]
 					RAM_write_flag = 0;
 					RAM_write_data = 32'b0;
 					RAM_write_addr = 16'b0;
+
+					DMA_STACK = 1'b0;
 				end
 			
 				(5'b11001): begin // REQFRAM
@@ -543,6 +573,8 @@ IO_out[57:42] => Value at third display (from LEFT) [HEX1 && HEX2 && HEX3]
 					RAM_write_flag = 0;
 					RAM_write_data = 32'b0;
 					RAM_write_addr = 16'b0;
+
+					DMA_STACK = 1'b0;
 				end
 
 				default: begin
@@ -556,6 +588,8 @@ IO_out[57:42] => Value at third display (from LEFT) [HEX1 && HEX2 && HEX3]
 
 					DMA_stack_flag = 0;
 					DMA_stack_data = 16'b0;
+
+					DMA_STACK = 1'b0;
 				end
 
 			endcase
@@ -570,6 +604,8 @@ IO_out[57:42] => Value at third display (from LEFT) [HEX1 && HEX2 && HEX3]
 
 			DMA_stack_flag = 0;
 			DMA_stack_data = 16'b0;
+
+			DMA_STACK = 1'b0;
 		end
 	end
 	

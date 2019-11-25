@@ -44,6 +44,18 @@ module SchedulerDecoder(
 					SCHED_OP[3:0] = 4'b0101;
 					SCHED_value[15:0] = immediate[15:0];
 				end
+
+				5'b00011: begin // Return last PC_POS | RETR
+					SCHED_conf = 1;
+					SCHED_OP[3:0] = 4'b0110;
+					SCHED_value[15:0] = {8'b0, current_instruction[27:16]};
+				end
+
+				5'b00100: begin // Return PC_POS | PC
+					SCHED_conf = 1;
+					SCHED_OP[3:0] = 4'b0111;
+					SCHED_value[15:0] = {8'b0, current_instruction[27:16]};
+				end
 				
 				default: begin
 					SCHED_conf = 0;
