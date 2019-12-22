@@ -155,6 +155,7 @@ end
 			case (REG_write_back_code)
 				clk: r_clk = REG_write_back_data[3:0];
 				src: r_src = REG_write_back_data[0];
+				esp: r_esp[15:0] = REG_write_back_data[15:0];
 
 				// EAX REGISTERs
 				eax: r_eax = REG_write_back_data;

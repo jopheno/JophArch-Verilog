@@ -7,7 +7,6 @@
    <irq preferredWidth="34" />
   </columns>
  </systemtable>
- <library
-   expandedCategories="Library/Memory Interfaces and Controllers/SDRAM,Project,Library/Memory Interfaces and Controllers,Library" />
- <window width="2902" height="1762" x="-11" y="-11" />
+ <library expandedCategories="Project,Library" />
+ <window width="2880" height="1740" x="0" y="0" />
 </preferences>
