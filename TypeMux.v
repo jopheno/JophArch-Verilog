@@ -4,7 +4,8 @@ module TypeMux(
 	output reg STACK_ENB,
 	output reg JMP_ENB,
 	output reg DMA_ENB,
-	output reg SCHED_ENB
+	output reg SCHED_ENB,
+	output reg UART_ENB
 );
 
 	parameter STACK_PARAM = 3'b001;
@@ -13,6 +14,7 @@ module TypeMux(
 	parameter DMA_PARAM = 3'b100;
 	parameter JMP_PARAM = 3'b111;
 	parameter SCHED_PARAM = 3'b101;
+	parameter UART_PARAM = 3'b110;
 
 	always@(*) begin
 		case (ID_type)
@@ -23,6 +25,7 @@ module TypeMux(
 				JMP_ENB = 0;
 				DMA_ENB = 0;
 				SCHED_ENB = 0;
+				UART_ENB = 0;
 			end
 
 			ALU2_PARAM: begin
@@ -31,6 +34,7 @@ module TypeMux(
 				JMP_ENB = 0;
 				DMA_ENB = 0;
 				SCHED_ENB = 0;
+				UART_ENB = 0;
 			end
 
 			STACK_PARAM: begin
@@ -39,6 +43,7 @@ module TypeMux(
 				JMP_ENB = 0;
 				DMA_ENB = 0;
 				SCHED_ENB = 0;
+				UART_ENB = 0;
 			end
 
 			JMP_PARAM: begin
@@ -47,6 +52,7 @@ module TypeMux(
 				JMP_ENB = 1;
 				DMA_ENB = 0;
 				SCHED_ENB = 0;
+				UART_ENB = 0;
 			end
 
 			DMA_PARAM: begin
@@ -55,6 +61,7 @@ module TypeMux(
 				JMP_ENB = 0;
 				DMA_ENB = 1;
 				SCHED_ENB = 0;
+				UART_ENB = 0;
 			end
 
 			SCHED_PARAM: begin
@@ -63,6 +70,16 @@ module TypeMux(
 				JMP_ENB = 0;
 				DMA_ENB = 0;
 				SCHED_ENB = 1;
+				UART_ENB = 0;
+			end
+
+			UART_PARAM: begin
+				ALU_ENB = 0;
+				STACK_ENB = 0;
+				JMP_ENB = 0;
+				DMA_ENB = 0;
+				SCHED_ENB = 0;
+				UART_ENB = 1;
 			end
 			
 			default: begin
@@ -71,6 +88,7 @@ module TypeMux(
 				JMP_ENB = 0;
 				DMA_ENB = 0;
 				SCHED_ENB = 0;
+				UART_ENB = 0;
 			end
 
 		endcase
