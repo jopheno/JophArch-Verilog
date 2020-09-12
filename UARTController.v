@@ -1,7 +1,6 @@
 module UARTController (
 	input clock,
 	input physical_clock,
-	input uart_clock,
 	input init_flag,
 	input UART_ENB,
 	input [2:0] instruction,
@@ -10,16 +9,6 @@ module UARTController (
 	output reg tx,
 	output reg wb_flag,
 	output reg [7:0] wb_data
-	
-	// TEST PURPOSES
-	/*output reg [1:0] read_state,
-	output reg [1:0] write_state,
-	output reg [2:0] amount_read,
-	output reg [2:0] amount_write,
-	
-	output reg [6:0] buffer_read,
-	output reg [6:0] buffer_size,
-	output reg [7:0] test_buffer*/
 );
 
 parameter IDLE = 2'b00;
@@ -37,7 +26,6 @@ reg [6:0] write_buffer_write;
 reg read_parity;
 reg write_parity;
 
-/* TEST PURPOSES */
 reg [1:0] read_state;
 reg [1:0] write_state;
 reg [3:0] amount_read;
@@ -45,21 +33,19 @@ reg [3:0] amount_write;
 	
 reg [6:0] buffer_read;
 reg [6:0] buffer_size;
-//reg [7:0] test_buffer;
 
 
 initial begin
 	integer i = 0;
 	amount_read = 3'b000;
+	amount_write = 3'b000;
+
 	buffer_size = 7'b0000000;
 
 	for (i = 0; i < 128; i = i +1) begin
 		buffer[i] = 8'b00000000;
 	end
 end
-
-// assign wb_flag = buffer_read != buffer_size;
-// assign wb_data = buffer[buffer_read];
 
 always@(posedge physical_clock) begin
 	if (UART_ENB) begin
@@ -73,7 +59,6 @@ always@(posedge physical_clock) begin
 			(3'b010): begin
 				wb_flag = 1;
 				wb_data[7:0] = buffer[buffer_read[6:0]][7:0];
-				//wb_data[7:0] = 10;
 			end
 			
 			// Write value
@@ -131,23 +116,35 @@ always@(negedge clock) begin
 	
 end
 
-reg[7:0] c;
+reg[31:0] c;
 reg custom_uart_clock;
 
-always@(posedge clock) begin
+parameter desired_baudrate = 1200;
+
+// If I count to 25000000 it will give me a 1Hz frequency clock,
+// to describe the baud rate I must consider the time needed to
+// read a byte, on this implementation case, it needs 1 cycle for
+// the starting bit recognition, 8 cycles for reading each bit from
+// the data, and one last cycle for the parity bit, so it sums up 10
+// cycles for each 8 bits block being read, so, to convert to baudrate
+// I must divide by 10 the counter, this way counting up to 2500000 will
+// give me a 1 baud rate, if I want a higher baudrate, I must speed
+// up the process by dividing this count amount per the baudrate
+// desired.
+always@(posedge physical_clock) begin
 	if (!init_flag) begin
-		c[7:0] = 8'b0;
+		c[31:0] = 32'b0;
 	end
 	
-	if (c[7:0] >= 4) begin
+	if (c[31:0] >= (2500000/desired_baudrate)) begin
 		custom_uart_clock = ~custom_uart_clock;
-		c[7:0] = 0;
+		c[31:0] = 0;
 	end
 	
-	c[7:0] = c[7:0] + 1;
+	c[31:0] = c[31:0] + 1;
 end
 
-always@(posedge physical_clock) begin
+always@(posedge custom_uart_clock) begin
 	if (!init_flag) begin
 		amount_read = 0;
 		amount_write = 0;
@@ -185,6 +182,7 @@ always@(posedge physical_clock) begin
 		
 		(PARITY): begin
 			tx = write_parity;
+			amount_write = 0;
 			write_buffer_size = write_buffer_size + 1;
 			write_state = IDLE;
 		end
@@ -197,6 +195,7 @@ always@(posedge physical_clock) begin
 	case(read_state)
 		(IDLE): begin
 			read_parity = 0;
+			amount_read = 0;
 			if (rx == 0)
 				read_state = READING;
 			else

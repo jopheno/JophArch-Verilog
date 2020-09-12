@@ -376,7 +376,6 @@ module DataPath(
 	UARTController inst_uart_controller_a(
 		clock,
 		physical_clock,
-		clock,
 		init_flag,
 		UART_ENB,
 		uart_instr_a,
@@ -404,7 +403,6 @@ module DataPath(
 	UARTController inst_uart_controller_b(
 		clock,
 		physical_clock,
-		clock,
 		init_flag,
 		UART_ENB,
 		uart_instr_b,
