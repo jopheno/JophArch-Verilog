@@ -12,7 +12,7 @@ module UARTDecoder(
 );
 
 always@(*) begin
-		if (UART_ENB) begin
+	if (UART_ENB) begin
 			case (DMA_current_instruction[28:24])
 			
 				5'b00000: begin // NOP
@@ -78,6 +78,35 @@ always@(*) begin
 					UART_channel = 1;
 				end
 
+			
+				5'b01001: begin // ADEBUG1
+					UART_instr = 3'b101;
+					UART_code_value = DMA_current_instruction[23:16];
+					UART_write_value = 8'b0;
+					UART_channel = 1;
+				end
+			
+				5'b01010: begin // ADEBUG2
+					UART_instr = 3'b110;
+					UART_code_value = DMA_current_instruction[23:16];
+					UART_write_value = 8'b0;
+					UART_channel = 1;
+				end
+			
+				5'b11001: begin // BDEBUG1
+					UART_instr = 3'b101;
+					UART_code_value = DMA_current_instruction[23:16];
+					UART_write_value = 8'b0;
+					UART_channel = 1;
+				end
+			
+				5'b11010: begin // BDEBUG2
+					UART_instr = 3'b110;
+					UART_code_value = DMA_current_instruction[23:16];
+					UART_write_value = 8'b0;
+					UART_channel = 1;
+				end
+
 				default: begin
 					UART_instr = 3'b000;
 					UART_code_value = 8'b0;
@@ -85,7 +114,12 @@ always@(*) begin
 					UART_channel = 0;
 				end
 			endcase
-		end
+	end else begin
+		UART_instr = 3'b000;
+		UART_code_value = 8'b0;
+		UART_write_value = 8'b0;
+		UART_channel = 0;
+	end
 end
 
 endmodule

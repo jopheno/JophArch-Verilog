@@ -1,5 +1,6 @@
 module UARTController (
 	input clock,
+	input physical_clock,
 	input uart_clock,
 	input init_flag,
 	input UART_ENB,
@@ -39,12 +40,12 @@ reg write_parity;
 /* TEST PURPOSES */
 reg [1:0] read_state;
 reg [1:0] write_state;
-reg [2:0] amount_read;
-reg [2:0] amount_write;
+reg [3:0] amount_read;
+reg [3:0] amount_write;
 	
 reg [6:0] buffer_read;
 reg [6:0] buffer_size;
-reg [7:0] test_buffer;
+//reg [7:0] test_buffer;
 
 
 initial begin
@@ -57,61 +58,103 @@ initial begin
 	end
 end
 
-always@(negedge clock) begin
+// assign wb_flag = buffer_read != buffer_size;
+// assign wb_data = buffer[buffer_read];
 
-	if (!init_flag) begin
-		write_buffer_write = 0;
-	end
-	
+always@(posedge physical_clock) begin
 	if (UART_ENB) begin
-	
 		case(instruction)
-			// Is value available
 			(3'b001): begin
-				if (buffer_read != buffer_size) begin
-					wb_data = 8'b00000001;
-				end else begin
-					wb_data = 8'b00000000;
-				end
 				wb_flag = 1;
+				wb_data[7:0] = buffer_read[6:0] != buffer_size[6:0];
 			end
-			
+
 			// Read value
 			(3'b010): begin
-				if (buffer_read != buffer_size) begin
-					wb_data = buffer[buffer_read];
-					buffer_read = buffer_read + 1;
-				end else begin
-					wb_data = 8'b00000000;
-				end
 				wb_flag = 1;
+				wb_data[7:0] = buffer[buffer_read[6:0]][7:0];
+				//wb_data[7:0] = 10;
 			end
 			
 			// Write value
 			(3'b011): begin
-				write_buffer[write_buffer_write] = write_value;
-				write_buffer_write = write_buffer_write + 1;
 				wb_flag = 0;
-				wb_data = 8'b00000000;
+				wb_data[7:0] = 0;
+			end
+
+			// DEBUG1 buffer_read
+			(3'b101): begin
+				wb_flag = 1;
+				wb_data[7:0] = {1'b0, buffer_read[6:0]};
+			end
+
+			// DEBUG2 buffer_size
+			(3'b110): begin
+				wb_flag = 1;
+				wb_data[7:0] = {1'b0, buffer_size[6:0]};
 			end
 			
 			default: begin
 				wb_flag = 0;
-				wb_data = 8'b00000000;
+				wb_data[7:0] = 0;
 			end
 		endcase
+	end else begin
+		wb_flag = 0;
+		wb_data[7:0] = 0;
+	end
+end
+
+always@(negedge clock) begin
+
+	if (!init_flag) begin
+		write_buffer_write = 0;
+		buffer_read = 0;
+	end
 	
+	if (UART_ENB) begin
+		case(instruction)
+			// Read value
+			(3'b010): begin
+				if (buffer_read[6:0] != buffer_size[6:0]) begin
+					buffer_read[6:0] = buffer_read[6:0] + 1;
+				end
+			end
+			
+			// Write value
+			(3'b011): begin
+				write_buffer[write_buffer_write[6:0]][7:0] = write_value[7:0];
+				write_buffer_write[6:0] = write_buffer_write[6:0] + 1;
+			end
+		endcase
 	end
 	
 end
 
-always@(posedge uart_clock) begin
+reg[7:0] c;
+reg custom_uart_clock;
+
+always@(posedge clock) begin
+	if (!init_flag) begin
+		c[7:0] = 8'b0;
+	end
+	
+	if (c[7:0] >= 4) begin
+		custom_uart_clock = ~custom_uart_clock;
+		c[7:0] = 0;
+	end
+	
+	c[7:0] = c[7:0] + 1;
+end
+
+always@(posedge physical_clock) begin
 	if (!init_flag) begin
 		amount_read = 0;
 		amount_write = 0;
 		buffer_size = 0;
 		write_buffer_size = 0;
 		write_parity = 0;
+		tx = 1;
 		read_state = IDLE;
 		write_state = IDLE;
 	end
@@ -119,41 +162,41 @@ always@(posedge uart_clock) begin
 	case(write_state)
 		(IDLE): begin
 			write_parity = 0;
-
+			amount_write = 0;
+			tx = 1;
 			if (write_buffer_size != write_buffer_write) begin
 				tx = 0;
 				write_state = WRITING;
-			end else begin
-				tx = 1;
 			end
 		end
 		
 		(WRITING): begin
-			write_parity = write_parity + write_buffer[amount_write];
-			tx = write_buffer[amount_write];
+			tx = write_buffer[write_buffer_size][amount_write];
+			write_parity = write_parity + tx;
 			amount_write = amount_write + 1;
 			
-			if (amount_write == 0) begin
+			if (amount_write >= 8) begin
 				write_state = PARITY;
+			end
+			else begin
+				write_state = WRITING;
 			end
 		end
 		
 		(PARITY): begin
 			tx = write_parity;
 			write_buffer_size = write_buffer_size + 1;
-
 			write_state = IDLE;
 		end
 		
 		default: begin
-		
+			write_state = IDLE;
 		end
 	endcase
 
 	case(read_state)
 		(IDLE): begin
 			read_parity = 0;
-
 			if (rx == 0)
 				read_state = READING;
 			else
@@ -163,10 +206,10 @@ always@(posedge uart_clock) begin
 		(READING): begin
 			read_parity = read_parity + rx;
 			buffer[buffer_size][amount_read] = rx;
-			test_buffer[amount_read] = rx;
+			//test_buffer[amount_read] = rx;
 			amount_read = amount_read + 1;
 			
-			if (amount_read == 0) begin
+			if (amount_read >= 8) begin
 				read_state = PARITY;
 			end
 		end
@@ -176,13 +219,13 @@ always@(posedge uart_clock) begin
 				read_state = ENDING;
 			else begin
 				read_state = IDLE;
-				amount_read = 0;
 			end
 		end
 		
 		(ENDING): begin
 			buffer_size = buffer_size + 1;
-			test_buffer = 8'b00000000;
+			amount_read = 0;
+			//test_buffer = 8'b00000000;
 
 			if (rx == 0)
 				read_state = READING;

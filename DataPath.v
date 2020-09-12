@@ -345,10 +345,6 @@ module DataPath(
 	wire [7:0] uart_code_value;
 	wire [7:0] uart_write_value;
 	
-	assign UART_write_back_flag = ( uart_channel == 0 ) ? uart_wb_flag_a : uart_wb_flag_b;
-	assign UART_write_back_code = uart_code_value;
-	assign UART_write_back_value = ( uart_channel == 0 ) ? uart_wb_data_a : uart_wb_data_b;
-	
 	UARTDecoder inst_uart_decoder(
 		UART_ENB,
 		curr_instruction,
@@ -380,6 +376,7 @@ module DataPath(
 	UARTController inst_uart_controller_a(
 		clock,
 		physical_clock,
+		clock,
 		init_flag,
 		UART_ENB,
 		uart_instr_a,
@@ -407,6 +404,7 @@ module DataPath(
 	UARTController inst_uart_controller_b(
 		clock,
 		physical_clock,
+		clock,
 		init_flag,
 		UART_ENB,
 		uart_instr_b,
@@ -416,6 +414,10 @@ module DataPath(
 		uart_wb_flag_b,
 		uart_wb_data_b
 	);
+
+	assign UART_write_back_flag = ( uart_channel == 0 ) ? uart_wb_flag_a : uart_wb_flag_b;
+	assign UART_write_back_code = uart_code_value;
+	assign UART_write_back_value = ( uart_channel == 0 ) ? uart_wb_data_a : uart_wb_data_b;
 	
 	Scheduler inst_scheduler(
 		init_flag,
