@@ -1,15 +1,30 @@
 module UARTController (
 	input clock,
 	input physical_clock,
+	input uart_clock,
 	input init_flag,
 	input UART_ENB,
 	input [2:0] instruction,
 	input [7:0] write_value,
 	input rx,
+	input ready_to_receive,
 	output reg tx,
+	output reg ready_to_send,
 	output reg wb_flag,
 	output reg [7:0] wb_data
+	
+	// TEST PURPOSES
+	//output [1:0] read_state_out,
+	//output reg [1:0] write_state,
+	//output reg [2:0] amount_read,
+	//output reg [2:0] amount_write,
+	
+	//output reg [6:0] buffer_read,
+	//output reg [6:0] buffer_size
+	//output reg [7:0] test_buffer
 );
+
+assign read_state_out = read_state;
 
 parameter IDLE = 2'b00;
 parameter READING = 2'b01;
@@ -22,10 +37,12 @@ reg [7:0] buffer [128];
 reg [7:0] write_buffer [128];
 reg [6:0] write_buffer_size;
 reg [6:0] write_buffer_write;
+reg read_control;
 
 reg read_parity;
 reg write_parity;
 
+/* TEST PURPOSES */
 reg [1:0] read_state;
 reg [1:0] write_state;
 reg [3:0] amount_read;
@@ -33,21 +50,30 @@ reg [3:0] amount_write;
 	
 reg [6:0] buffer_read;
 reg [6:0] buffer_size;
+//reg [7:0] test_buffer;
 
 
 initial begin
 	integer i = 0;
 	amount_read = 3'b000;
-	amount_write = 3'b000;
-
 	buffer_size = 7'b0000000;
+	tx = 1;
+	ready_to_send = 0;
 
 	for (i = 0; i < 128; i = i +1) begin
 		buffer[i] = 8'b00000000;
 	end
 end
 
+// assign wb_flag = buffer_read != buffer_size;
+// assign wb_data = buffer[buffer_read];
+
 always@(posedge physical_clock) begin
+	if (!init_flag) begin
+		wb_flag = 0;
+	end
+
+	//wb_flag = buffer_read != buffer_size;
 	if (UART_ENB) begin
 		case(instruction)
 			(3'b001): begin
@@ -59,6 +85,7 @@ always@(posedge physical_clock) begin
 			(3'b010): begin
 				wb_flag = 1;
 				wb_data[7:0] = buffer[buffer_read[6:0]][7:0];
+				//wb_data[7:0] = 10;
 			end
 			
 			// Write value
@@ -85,7 +112,6 @@ always@(posedge physical_clock) begin
 			end
 		endcase
 	end else begin
-		wb_flag = 0;
 		wb_data[7:0] = 0;
 	end
 end
@@ -93,8 +119,8 @@ end
 always@(negedge clock) begin
 
 	if (!init_flag) begin
-		write_buffer_write = 0;
 		buffer_read = 0;
+		write_buffer_write = 0;
 	end
 	
 	if (UART_ENB) begin
@@ -105,7 +131,6 @@ always@(negedge clock) begin
 					buffer_read[6:0] = buffer_read[6:0] + 1;
 				end
 			end
-			
 			// Write value
 			(3'b011): begin
 				write_buffer[write_buffer_write[6:0]][7:0] = write_value[7:0];
@@ -116,35 +141,14 @@ always@(negedge clock) begin
 	
 end
 
-reg[31:0] c;
-reg custom_uart_clock;
-
-parameter desired_baudrate = 1200;
-
-// If I count to 25000000 it will give me a 1Hz frequency clock,
-// to describe the baud rate I must consider the time needed to
-// read a byte, on this implementation case, it needs 1 cycle for
-// the starting bit recognition, 8 cycles for reading each bit from
-// the data, and one last cycle for the parity bit, so it sums up 10
-// cycles for each 8 bits block being read, so, to convert to baudrate
-// I must divide by 10 the counter, this way counting up to 2500000 will
-// give me a 1 baud rate, if I want a higher baudrate, I must speed
-// up the process by dividing this count amount per the baudrate
-// desired.
-always@(posedge physical_clock) begin
+always@(posedge clock) begin
 	if (!init_flag) begin
-		c[31:0] = 32'b0;
+		ready_to_send = 1;
 	end
-	
-	if (c[31:0] >= (2500000/desired_baudrate)) begin
-		custom_uart_clock = ~custom_uart_clock;
-		c[31:0] = 0;
-	end
-	
-	c[31:0] = c[31:0] + 1;
 end
 
-always@(posedge custom_uart_clock) begin
+//always@(posedge (uart_clock && ready_to_receive)) begin
+always@(posedge uart_clock) begin
 	if (!init_flag) begin
 		amount_read = 0;
 		amount_write = 0;

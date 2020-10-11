@@ -343,7 +343,7 @@ module DataPath(
 	wire uart_channel;
 	wire [2:0] uart_instr;
 	wire [7:0] uart_code_value;
-	wire [7:0] uart_write_value;
+	wire [31:0] uart_write_value;
 	
 	UARTDecoder inst_uart_decoder(
 		UART_ENB,
@@ -360,20 +360,23 @@ module DataPath(
 	
 	
 	wire [2:0] uart_instr_a;
-	wire [7:0] uart_write_value_a;
+	wire [31:0] uart_write_value_a;
 	wire rx_a;
 	wire tx_a;
+	wire rtr_a;
+	wire rts_a;
 
 	wire uart_wb_flag_a;
 	wire [7:0] uart_wb_data_a;
 	
 	assign uart_instr_a = ( uart_channel == 0 )? uart_instr : 3'b0;
-	assign uart_write_value_a = ( uart_channel == 0 )? uart_write_value : 8'b0;
+	assign uart_write_value_a = ( uart_channel == 0 )? uart_write_value : 32'b0;
 	
 	assign rx_a = tx_b;
+	assign rtr_a = rts_b;
 	
 	
-	UARTController inst_uart_controller_a(
+	UARTModule inst_uart_module_a(
 		clock,
 		physical_clock,
 		init_flag,
@@ -381,6 +384,8 @@ module DataPath(
 		uart_instr_a,
 		uart_write_value_a,
 		rx_a,
+		rtr_a,
+		rts_a,
 		tx_a,
 		uart_wb_flag_a,
 		uart_wb_data_a
@@ -388,19 +393,22 @@ module DataPath(
 	
 	
 	wire [2:0] uart_instr_b;
-	wire [7:0] uart_write_value_b;
+	wire [31:0] uart_write_value_b;
 	wire rx_b;
 	wire tx_b;
+	wire rtr_b;
+	wire rts_b;
 
 	wire uart_wb_flag_b;
 	wire [7:0] uart_wb_data_b;
 	
 	assign uart_instr_b = ( uart_channel == 1 )? uart_instr : 3'b0;
-	assign uart_write_value_b = ( uart_channel == 1 )? uart_write_value : 8'b0;
+	assign uart_write_value_b = ( uart_channel == 1 )? uart_write_value : 32'b0;
 	
 	assign rx_b = tx_a;
+	assign rtr_b = rts_a;
 	
-	UARTController inst_uart_controller_b(
+	UARTModule inst_uart_module_b(
 		clock,
 		physical_clock,
 		init_flag,
@@ -408,6 +416,8 @@ module DataPath(
 		uart_instr_b,
 		uart_write_value_b,
 		rx_b,
+		rtr_b,
+		rts_b,
 		tx_b,
 		uart_wb_flag_b,
 		uart_wb_data_b
