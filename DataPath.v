@@ -80,6 +80,7 @@ module DataPath(
 	wire STACK_ENB;
 	wire JMP_ENB;
 	wire SCHED_ENB;
+	wire UART_ENB;
 	
 	wire NOP_flag;
 	wire CALL_flag;
@@ -145,6 +146,11 @@ module DataPath(
 	wire SCHED_write_back_flag;
 	wire [7:0] SCHED_write_back_code;
 	wire [31:0] SCHED_write_back_value;
+
+	//wire UART_ENB;
+	wire UART_write_back_flag;
+	wire [7:0] UART_write_back_code;
+	wire [31:0] UART_write_back_value;
 	
 	wire [31:0] clock_eff;
 
@@ -280,6 +286,11 @@ module DataPath(
 		SCHED_write_back_code,
 		SCHED_write_back_value,
 
+		UART_ENB,
+		UART_write_back_flag,
+		UART_write_back_code,
+		UART_write_back_value,
+
 		REG_write_back_flag,
 		REG_write_back_code,
 		REG_write_back_data
@@ -291,7 +302,8 @@ module DataPath(
 		STACK_ENB,
 		JMP_ENB,
 		DMA_ENB,
-		SCHED_ENB
+		SCHED_ENB,
+		UART_ENB
 	);
 	
 	/*NDMA inst_new_dma(
@@ -326,6 +338,94 @@ module DataPath(
 	wire [15:0] hdd_addr;
 	wire [31:0] hdd_wb_data;
 	wire [31:0] hdd_data;
+	
+	wire uart_clock;
+	wire uart_channel;
+	wire [2:0] uart_instr;
+	wire [7:0] uart_code_value;
+	wire [31:0] uart_write_value;
+	
+	UARTDecoder inst_uart_decoder(
+		UART_ENB,
+		curr_instruction,
+		f_register_value,
+		s_register_value,
+		t_register_value,
+		curr_instruction[23:0],
+		uart_channel,
+		uart_instr,
+		uart_code_value,
+		uart_write_value
+	);
+	
+	
+	wire [2:0] uart_instr_a;
+	wire [31:0] uart_write_value_a;
+	wire rx_a;
+	wire tx_a;
+	wire rtr_a;
+	wire rts_a;
+
+	wire uart_wb_flag_a;
+	wire [7:0] uart_wb_data_a;
+	
+	assign uart_instr_a = ( uart_channel == 0 )? uart_instr : 3'b0;
+	assign uart_write_value_a = ( uart_channel == 0 )? uart_write_value : 32'b0;
+	
+	assign rx_a = tx_b;
+	assign rtr_a = rts_b;
+	
+	
+	UARTModule inst_uart_module_a(
+		clock,
+		physical_clock,
+		init_flag,
+		UART_ENB,
+		uart_instr_a,
+		uart_write_value_a,
+		rx_a,
+		rtr_a,
+		rts_a,
+		tx_a,
+		uart_wb_flag_a,
+		uart_wb_data_a
+	);
+	
+	
+	wire [2:0] uart_instr_b;
+	wire [31:0] uart_write_value_b;
+	wire rx_b;
+	wire tx_b;
+	wire rtr_b;
+	wire rts_b;
+
+	wire uart_wb_flag_b;
+	wire [7:0] uart_wb_data_b;
+	
+	assign uart_instr_b = ( uart_channel == 1 )? uart_instr : 3'b0;
+	assign uart_write_value_b = ( uart_channel == 1 )? uart_write_value : 32'b0;
+	
+	assign rx_b = tx_a;
+	assign rtr_b = rts_a;
+	
+	UARTModule inst_uart_module_b(
+		clock,
+		physical_clock,
+		init_flag,
+		UART_ENB,
+		uart_instr_b,
+		uart_write_value_b,
+		rx_b,
+		rtr_b,
+		rts_b,
+		tx_b,
+		uart_wb_flag_b,
+		uart_wb_data_b
+	);
+
+	assign UART_write_back_flag = ( uart_channel == 0 ) ? uart_wb_flag_a : uart_wb_flag_b;
+	assign UART_write_back_code = uart_code_value;
+	assign UART_write_back_value = ( uart_channel == 0 ) ? uart_wb_data_a : uart_wb_data_b;
 	
 	Scheduler inst_scheduler(
 		init_flag,

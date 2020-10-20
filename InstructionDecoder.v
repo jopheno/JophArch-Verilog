@@ -50,6 +50,14 @@ module InstructionDecoder (
 				f_register_code = ID_instruction[7:0];
 			end
 		
+			// UART
+		
+			(3'b110): begin
+				t_register_code = ID_instruction[23:16];
+				s_register_code = ID_instruction[15:8];
+				f_register_code = ID_instruction[7:0];
+			end
+		
 			default: begin
 				f_register_code = 8'b0;
 				s_register_code = 8'b0;
